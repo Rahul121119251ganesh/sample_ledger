@@ -1,6 +1,6 @@
 const SUPABASE_URL = 'https://iojcfzxwafdbnhxfgffe.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvamNmenh3YWZkYm5oeGZnZmZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzYyOTcsImV4cCI6MjA5NDg1MjI5N30.2Ao6_cxFev400bf8MB8831zUdcihsKIwdhw_ezFPFlE';
-//const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null; // Stores the logged-in username string
 
 // --- State Management ---
@@ -176,24 +176,41 @@ async function handleAuthChange(session) {
     const sidebar = document.getElementById('app-sidebar');
     const mainContent = document.getElementById('app-main-content');
     const loginModule = document.getElementById('module-login');
-    const defaultModule = document.getElementById('module-outgoing');
+    
+    // Safely handles both 'module-outgoing-gold' and 'module-outgoing' names
+    const defaultModule = document.getElementById('module-outgoing-gold') || document.getElementById('module-outgoing');
     const allModules = document.querySelectorAll('.module');
     
     if (currentUser) {
         if (sidebar) sidebar.style.display = 'flex';
+        if (mainContent) mainContent.style.display = 'block';
+        
         allModules.forEach(m => m.classList.remove('active'));
+        if (loginModule) loginModule.style.display = 'none';
         if (loginModule) loginModule.classList.remove('active');
-        if (defaultModule) defaultModule.classList.add('active');
+        
+        // Safety check to prevent the classList crash
+        if (defaultModule) {
+            defaultModule.classList.add('active');
+        } else {
+            console.warn("Could not find default module panel element to display.");
+        }
         
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector('[data-target="module-outgoing"]')?.classList.add('active');
         
-        // Load data safely
+        const defaultNavBtn = document.querySelector('[data-target="module-outgoing"]') || 
+                               document.querySelector('[data-target="module-outgoing-gold"]');
+        if (defaultNavBtn) defaultNavBtn.classList.add('active');
+        
         await loadStateFromCloud();
     } else {
         if (sidebar) sidebar.style.display = 'none';
+        if (mainContent) mainContent.style.display = 'none';
         allModules.forEach(m => m.classList.remove('active'));
-        if (loginModule) loginModule.classList.add('active');
+        if (loginModule) {
+            loginModule.style.display = 'block';
+            loginModule.classList.add('active');
+        }
         state = { incoming: [], conversions: [], losses: [], boxStarts: [], boxRemovals: [], distribution: [], suggestions: { purposes: [], workers: [], boxes: [], names: [] } };
     }
 }
