@@ -86,32 +86,50 @@ async function initAuth() {
     try {
         console.log("Attempting login for:", usernameInput);
 
-        // We wrap "User name" in quotes because it contains a space character
+        // Fetch the rows safely without filtering by a spaced column name
         const { data, error } = await supabase
             .from('app_users')
-            .select('"User name", Password')
-            .eq('User name', usernameInput);
+            .select('*');
 
-        console.log("Supabase Error Object:", error);
-        console.log("Supabase Received Data:", data);
+        console.log("Supabase Error Status:", error);
+        console.log("Raw Database Rows Found:", data);
 
-        // Check if user exists and match the case-sensitive column headers
-        if (error || !data || data.length === 0 || data['Password'] !== passwordInput) {
+        if (error || !data || data.length === 0) {
+            errDiv.textContent = "Database connection error or no users found.";
+            errDiv.style.display = 'block';
+            submitBtn.textContent = 'Login';
+            submitBtn.disabled = false;
+            return;
+        }
+
+        // Search through the rows matching both names dynamically case-insensitive/sensitive
+        const matchedUser = data.find(user => {
+            // Check all possible space/case combinations just to be 100% safe
+            const dbUsername = user['User name'] || user['username'] || user['Username'];
+            const dbPassword = user['Password'] || user['password'];
+            
+            return dbUsername === usernameInput && dbPassword === passwordInput;
+        });
+
+        if (!matchedUser) {
             errDiv.textContent = "Invalid username or password.";
             errDiv.style.display = 'block';
             submitBtn.textContent = 'Login';
             submitBtn.disabled = false;
         } else {
-            console.log("Login verified! Changing view...");
-            // Save the verified username session string
-            localStorage.setItem('app_user_session', data['User name']);
-            handleAuthChange(data['User name']);
+            console.log("Login verified successfully! Routing to dashboard...");
+            
+            // Get the username string safely
+            const finalUser = matchedUser['User name'] || matchedUser['username'] || matchedUser['Username'];
+            
+            localStorage.setItem('app_user_session', finalUser);
+            handleAuthChange(finalUser);
             loginForm.reset();
             submitBtn.textContent = 'Login';
             submitBtn.disabled = false;
         }
     } catch (err) {
-        console.error("Network or script error crashed the process:", err);
+        console.error("Critical routing crash:", err);
         errDiv.textContent = "Connection error. Please try again.";
         errDiv.style.display = 'block';
         submitBtn.textContent = 'Login';
