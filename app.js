@@ -74,8 +74,8 @@ async function initAuth() {
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('login-username').value.trim();
-    const password = document.getElementById('login-password').value;
+    const usernameInput = document.getElementById('login-username').value.trim();
+    const passwordInput = document.getElementById('login-password').value;
     const errDiv = document.getElementById('login-error');
     const submitBtn = document.getElementById('btn-login-submit');
     
@@ -84,28 +84,34 @@ async function initAuth() {
     submitBtn.textContent = 'Verifying...';
 
     try {
-        // Fetch the user from the custom internet table
+        console.log("Attempting login for:", usernameInput);
+
+        // We wrap "User name" in quotes because it contains a space character
         const { data, error } = await supabase
             .from('app_users')
-            .select('username, password')
-            .eq('username', username);
+            .select('"User name", Password')
+            .eq('User name', usernameInput);
 
-        // Check if user exists and password matches perfectly
-        if (error || !data || data.length === 0 || data.password !== password) {
+        console.log("Supabase Error Object:", error);
+        console.log("Supabase Received Data:", data);
+
+        // Check if user exists and match the case-sensitive column headers
+        if (error || !data || data.length === 0 || data['Password'] !== passwordInput) {
             errDiv.textContent = "Invalid username or password.";
             errDiv.style.display = 'block';
             submitBtn.textContent = 'Login';
             submitBtn.disabled = false;
         } else {
-            // Success! Save session and trigger screen routing
-            localStorage.setItem('app_user_session', data.username);
-            handleAuthChange(data.username);
+            console.log("Login verified! Changing view...");
+            // Save the verified username session string
+            localStorage.setItem('app_user_session', data['User name']);
+            handleAuthChange(data['User name']);
             loginForm.reset();
             submitBtn.textContent = 'Login';
             submitBtn.disabled = false;
         }
     } catch (err) {
-        console.error("Auth error:", err);
+        console.error("Network or script error crashed the process:", err);
         errDiv.textContent = "Connection error. Please try again.";
         errDiv.style.display = 'block';
         submitBtn.textContent = 'Login';
