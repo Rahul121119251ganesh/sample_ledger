@@ -31,7 +31,7 @@ async function loadStateFromCloud() {
             supabase.from('losses').select('*'),
             supabase.from('box_starts').select('*'),
             supabase.from('box_removals').select('*'),
-            supabase.from('distributions').select('*')
+            supabase.from('distributions').select('*') // Handled table name synchronization
         ]);
         
         state.incoming = inc.data || [];
@@ -325,7 +325,8 @@ window.bulkDelete = async function(moduleKey) {
     const idsToDelete = indicesToDelete.map(index => state[stateArrayName][index].id);
 
     try {
-        await supabase.from(tableName).delete().in('id', idsToDelete);
+        const { error } = await supabase.from(tableName).delete().in('id', idsToDelete);
+        if (error) throw error;
         
         indicesToDelete.forEach(index => {
             state[stateArrayName].splice(index, 1);
@@ -341,11 +342,11 @@ window.bulkDelete = async function(moduleKey) {
         if(selectAllCb) selectAllCb.checked = false;
 
         if (moduleKey === 'invRem') renderInventoryModule();
-        else window[`render${capitalizeFirstLetter(moduleKey)}`]();
+        else window[`render${capitalizeFirstLetter(moduleKey)}` ]();
         
         updateDailySummary();
     } catch(e) {
-        console.error("Bulk delete failed", e);
+        console.error("Bulk delete execution error:", e);
     }
 }
 
