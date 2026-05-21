@@ -218,30 +218,6 @@ async function handleAuthChange(session) {
     }
 }
 
-async function handleAuthChange(user) {
-    currentUser = user;
-    const sidebar = document.getElementById('app-sidebar');
-    const loginModule = document.getElementById('module-login');
-    const defaultModule = document.getElementById('module-outgoing');
-    const allModules = document.querySelectorAll('.module');
-    
-    if (currentUser) {
-        sidebar.style.display = 'flex';
-        allModules.forEach(m => m.classList.remove('active'));
-        loginModule.classList.remove('active');
-        defaultModule.classList.add('active');
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector('[data-target="module-outgoing"]')?.classList.add('active');
-        
-        await loadStateFromCloud();
-    } else {
-        sidebar.style.display = 'none';
-        allModules.forEach(m => m.classList.remove('active'));
-        loginModule.classList.add('active');
-        state = { incoming: [], conversions: [], losses: [], boxStarts: [], boxRemovals: [], distribution: [], suggestions: { purposes: [], workers: [], boxes: [], names: [] } };
-    }
-}
-
 // --- Utilities ---
 function capitalizeFirstLetter(string) {
     if (!string) return '';
