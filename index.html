@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heena Jewellery Works</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <nav class="sidebar" id="app-sidebar" style="display: none;">
+            <div class="brand">
+                <i class="ph-fill ph-sketch-logo brand-icon"></i>
+                <h1>Heena Jewellery Works</h1>
+            </div>
+            
+            <ul class="nav-links">
+                <li>
+                    <button class="nav-btn" data-target="module-incoming">
+                        <i class="ph ph-arrow-down-left"></i>
+                        Incoming Gold
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn active" data-target="module-outgoing">
+                        <i class="ph ph-arrow-up-right"></i>
+                        Gold Used
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-target="module-loss">
+                        <i class="ph ph-trend-down"></i>
+                        Worker Loss
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-target="module-inventory">
+                        <i class="ph ph-package"></i>
+                        Box Inventory
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-target="module-distribution">
+                        <i class="ph ph-hand-coins"></i>
+                        Gold Distribution
+                    </button>
+                </li>
+                <li>
+                    <button class="nav-btn" data-target="module-daily">
+                        <i class="ph ph-calendar-check"></i>
+                        Daily Summary
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="sidebar-footer" style="margin-top: auto; padding: 16px;">
+                <button id="btn-logout" class="btn-secondary" style="width: 100%; justify-content: center; color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">
+                    <i class="ph ph-sign-out"></i> Logout
+                </button>
+            </div>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content" id="app-main-content">
+            
+            <!-- Module: Login (Auth) -->
+            <section id="module-login" class="module active" style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+    <div class="card login-container" style="max-width: 400px; width: 100%;">
+        <div class="brand" style="justify-content: center; border-bottom: none; margin-bottom: 16px; padding: 0;">
+            <i class="ph-fill ph-sketch-logo brand-icon" style="font-size: 40px;"></i>
+        </div>
+        <h2 style="text-align: center; color: var(--accent-color); margin-bottom: 8px;">Heena Jewellery Works</h2>
+        <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">Secure Ledger Access</p>
+        
+        <form id="login-form" class="input-form" style="display: flex; flex-direction: column;">
+            <div class="form-group">
+                <label for="login-username">Username</label>
+                <input type="text" id="login-username" required placeholder="Enter Username">
+            </div>
+            <div class="form-group">
+                <label for="login-password">Password</label>
+                <input type="password" id="login-password" required placeholder="Enter Password">
+            </div>
+            <button type="submit" class="btn-primary" id="btn-login-submit">Login</button>
+        </form>
+        <div id="login-error" style="color: var(--danger); text-align: center; margin-top: 16px; font-size: 0.9rem; display: none;"></div>
+    </div>
+</section>
+
+            <!-- Module 0: Incoming Gold -->
+            <section id="module-incoming" class="module">
+                <header class="module-header">
+                    <h2>Incoming Gold</h2>
+                    <p>Track all incoming 24ct gold.</p>
+                </header>
+
+                <div class="card form-card">
+                    <h3 id="inc-form-title">New Incoming Entry</h3>
+                    <form id="incoming-form" class="input-form">
+                        <input type="hidden" id="inc-edit-id" value="-1">
+                        <div class="form-group">
+                            <label for="inc-weight">Weight (24 ct. grams)</label>
+                            <input type="number" step="0.00000001" id="inc-weight" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="inc-date">Date</label>
+                            <input type="date" id="inc-date" required>
+                        </div>
+                        <button type="submit" class="btn-primary" id="inc-submit-btn">Add Entry</button>
+                    </form>
+                </div>
+
+                <div class="card table-card" id="tc-incoming">
+                    <div class="table-header-action">
+                        <h3>Incoming History</h3>
+                        <div class="action-buttons-header">
+                            <button class="btn-secondary" onclick="toggleEditMode('incoming')">
+                                <i class="ph ph-pencil"></i> Edit in Table
+                            </button>
+                            <div class="bulk-actions">
+                                <button class="btn-bulk btn-delete-bulk" id="inc-bulk-delete" onclick="bulkDelete('incoming')">Delete Selected</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox"><input type="checkbox" id="inc-select-all" onclick="toggleSelectAll('incoming')"></th>
+                                    <th>Serial Number</th>
+                                    <th>
+                                        Weight / 24 ct.
+                                        <input type="text" class="filter-input" id="filter-inc-weight" placeholder="Filter..." onkeyup="renderIncoming()">
+                                    </th>
+                                    <th>
+                                        Date
+                                        <input type="date" class="filter-input" id="filter-inc-date" onchange="renderIncoming()">
+                                    </th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="incoming-tbody">
+                                <!-- Entries will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 1: Gold Used -->
+            <section id="module-outgoing" class="module">
+                <header class="module-header">
+                    <h2>Gold Used</h2>
+                    <p>Track gold weight. 24ct converts to 22ct automatically if purpose is 'Melt'.</p>
+                </header>
+
+                <!-- Datalists for Auto-completion -->
+                <datalist id="purposes-list"></datalist>
+                <datalist id="workers-list"></datalist>
+                <datalist id="boxes-list"></datalist>
+                <datalist id="names-list"></datalist>
+
+                <div class="card form-card">
+                    <h3 id="conv-form-title">New Outgoing Entry</h3>
+                    <form id="outgoing-form" class="input-form">
+                        <input type="hidden" id="conv-edit-id" value="-1">
+                        <div class="form-group">
+                            <label for="conv-purpose">Purpose / Description</label>
+                            <input type="text" id="conv-purpose" list="purposes-list" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="conv-24ct">24 ct. (weight in grams)</label>
+                            <input type="number" step="0.00000001" id="conv-24ct" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="conv-date">Date</label>
+                            <input type="date" id="conv-date" required>
+                        </div>
+                        <button type="submit" class="btn-primary" id="conv-submit-btn">Add Entry</button>
+                    </form>
+                </div>
+
+                <div class="card table-card" id="tc-outgoing">
+                    <div class="table-header-action">
+                        <h3>Used History</h3>
+                        <div class="action-buttons-header">
+                            <button class="btn-secondary" onclick="toggleEditMode('outgoing')">
+                                <i class="ph ph-pencil"></i> Edit in Table
+                            </button>
+                            <div class="bulk-actions">
+                                <button class="btn-bulk btn-delete-bulk" id="out-bulk-delete" onclick="bulkDelete('outgoing')">Delete Selected</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox"><input type="checkbox" id="out-select-all" onclick="toggleSelectAll('outgoing')"></th>
+                                    <th>
+                                        Purpose
+                                        <input type="text" class="filter-input" id="filter-out-purpose" placeholder="Filter..." onkeyup="renderOutgoing()">
+                                    </th>
+                                    <th>
+                                        24 ct. (grams)
+                                        <input type="text" class="filter-input" id="filter-out-24ct" placeholder="Filter..." onkeyup="renderOutgoing()">
+                                    </th>
+                                    <th>
+                                        22 ct. (grams)
+                                        <input type="text" class="filter-input" id="filter-out-22ct" placeholder="Filter..." onkeyup="renderOutgoing()">
+                                    </th>
+                                    <th>
+                                        Date
+                                        <input type="date" class="filter-input" id="filter-out-date" onchange="renderOutgoing()">
+                                    </th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="outgoing-tbody">
+                                <!-- Entries will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 2: Worker Loss -->
+            <section id="module-loss" class="module">
+                <header class="module-header">
+                    <h2>Worker Loss</h2>
+                    <p>Track gold loss during operations by worker.</p>
+                </header>
+
+                <div class="card form-card">
+                    <h3 id="loss-form-title">Log Loss</h3>
+                    <form id="loss-form" class="input-form">
+                        <input type="hidden" id="loss-edit-id" value="-1">
+                        <div class="form-group">
+                            <label for="loss-worker">Worker Name</label>
+                            <input type="text" id="loss-worker" list="workers-list" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="loss-amount">Loss (grams)</label>
+                            <input type="number" step="0.01" id="loss-amount" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="loss-date">Date</label>
+                            <input type="date" id="loss-date" required>
+                        </div>
+                        <button type="submit" class="btn-primary" id="loss-submit-btn">Add Loss</button>
+                    </form>
+                </div>
+
+                <div class="card table-card" id="tc-loss">
+                    <div class="table-header-action">
+                        <h3>Loss Records</h3>
+                        <div class="totals-pill">
+                            <span class="total-label">Filtered Total Loss:</span>
+                            <span id="total-loss" class="total-value">0.00</span>
+                        </div>
+                        <div class="action-buttons-header">
+                            <button class="btn-secondary" onclick="toggleEditMode('loss')">
+                                <i class="ph ph-pencil"></i> Edit in Table
+                            </button>
+                            <div class="bulk-actions">
+                                <button class="btn-bulk btn-delete-bulk" id="loss-bulk-delete" onclick="bulkDelete('loss')">Delete Selected</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox"><input type="checkbox" id="loss-select-all" onclick="toggleSelectAll('loss')"></th>
+                                    <th>
+                                        Worker
+                                        <input type="text" class="filter-input" id="filter-loss-worker" placeholder="Filter..." onkeyup="renderLoss()">
+                                    </th>
+                                    <th>
+                                        Loss (grams)
+                                        <input type="text" class="filter-input" id="filter-loss-amount" placeholder="Filter..." onkeyup="renderLoss()">
+                                    </th>
+                                    <th>
+                                        Date
+                                        <input type="date" class="filter-input" id="filter-loss-date" onchange="renderLoss()">
+                                    </th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="loss-tbody">
+                                <!-- Entries will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 3: Box Inventory -->
+            <section id="module-inventory" class="module">
+                <header class="module-header">
+                    <h2>Box Inventory</h2>
+                    <p>Manage physical inventory of gold across different boxes. Filter by date to view starting and removed weights.</p>
+                </header>
+
+                <!-- Master Date Filter -->
+                <div class="card summary-filter-card" style="margin-bottom: 24px;">
+                    <div class="form-group" style="max-width: 300px;">
+                        <label for="master-inv-date">Master Date Filter</label>
+                        <input type="date" id="master-inv-date" onchange="renderInventoryModule()">
+                    </div>
+                </div>
+
+                <div class="inventory-split-layout" style="display: flex; flex-direction: column; gap: 32px;">
+                    
+                    <!-- Block 1: Starting Weights -->
+                    <div class="inventory-block">
+                        <div class="card form-card">
+                            <h3 id="inv-start-form-title">Set Starting Weight</h3>
+                            <form id="inv-start-form" class="input-form">
+                                <input type="hidden" id="inv-start-edit-id" value="-1">
+                                <div class="form-group">
+                                    <label for="inv-start-box">Box Number</label>
+                                    <input type="text" id="inv-start-box" list="boxes-list" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inv-start-weight">Weight (grams)</label>
+                                    <input type="number" step="0.01" id="inv-start-weight" required>
+                                </div>
+                                <button type="submit" class="btn-primary" id="inv-start-submit-btn">Set Starting Weight</button>
+                            </form>
+                        </div>
+
+                        <div class="card table-card" id="tc-inv-start">
+                            <div class="table-header-action">
+                                <h3>Starting Weights</h3>
+                            </div>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>
+                                                Box Number
+                                                <input type="text" class="filter-input" id="filter-inv-start-box" placeholder="Filter..." onkeyup="renderInventoryModule()">
+                                            </th>
+                                            <th>Weight (grams)</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inv-start-tbody">
+                                        <!-- Entries will be injected here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Block 2: Removed Weights -->
+                    <div class="inventory-block">
+                        <div class="card form-card">
+                            <h3 id="inv-rem-form-title">Log Removed Weight</h3>
+                            <form id="inv-rem-form" class="input-form">
+                                <input type="hidden" id="inv-rem-edit-id" value="-1">
+                                <div class="form-group">
+                                    <label for="inv-rem-box">Box Number</label>
+                                    <input type="text" id="inv-rem-box" list="boxes-list" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="inv-rem-weight">Weight (grams)</label>
+                                    <input type="number" step="0.01" id="inv-rem-weight" required>
+                                </div>
+                                <button type="submit" class="btn-primary" id="inv-rem-submit-btn">Log Removal</button>
+                            </form>
+                        </div>
+
+                        <div class="card table-card" id="tc-inv-rem">
+                            <div class="table-header-action">
+                                <h3>Removed Weights</h3>
+                                <div class="totals-pill">
+                                    <span class="total-label">Total Removed:</span>
+                                    <span id="total-inv-rem" class="total-value">0.00</span>
+                                </div>
+                                <div class="action-buttons-header">
+                                    <button class="btn-secondary" onclick="toggleEditMode('invRem')">
+                                        <i class="ph ph-pencil"></i> Edit in Table
+                                    </button>
+                                    <div class="bulk-actions">
+                                        <button class="btn-bulk btn-delete-bulk" id="inv-rem-bulk-delete" onclick="bulkDelete('invRem')">Delete Selected</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th class="col-checkbox"><input type="checkbox" id="invRem-select-all" onclick="toggleSelectAll('invRem')"></th>
+                                            <th>
+                                                Box Number
+                                                <input type="text" class="filter-input" id="filter-inv-rem-box" placeholder="Filter..." onkeyup="renderInventoryModule()">
+                                            </th>
+                                            <th>Weight (grams)</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inv-rem-tbody">
+                                        <!-- Entries will be injected here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- Module 4: Gold Distribution -->
+            <section id="module-distribution" class="module">
+                <header class="module-header">
+                    <h2>Gold Distribution</h2>
+                    <p>Track gold handed out to individuals.</p>
+                </header>
+
+                <div class="card form-card">
+                    <h3 id="dist-form-title">Log Distribution</h3>
+                    <form id="dist-form" class="input-form">
+                        <input type="hidden" id="dist-edit-id" value="-1">
+                        <div class="form-group">
+                            <label for="dist-name">Name</label>
+                            <input type="text" id="dist-name" list="names-list" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dist-weight">Weight Given (grams)</label>
+                            <input type="number" step="0.01" id="dist-weight" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="dist-date">Date</label>
+                            <input type="date" id="dist-date" required>
+                        </div>
+                        <button type="submit" class="btn-primary" id="dist-submit-btn">Add Record</button>
+                    </form>
+                </div>
+
+                <div class="card table-card" id="tc-distribution">
+                    <div class="table-header-action">
+                        <h3>Distribution Records</h3>
+                        <div class="totals-pill">
+                            <span class="total-label">Filtered Distributed:</span>
+                            <span id="total-distribution" class="total-value">0.00</span>
+                        </div>
+                        <div class="action-buttons-header">
+                            <button class="btn-secondary" onclick="toggleEditMode('distribution')">
+                                <i class="ph ph-pencil"></i> Edit in Table
+                            </button>
+                            <div class="bulk-actions">
+                                <button class="btn-bulk btn-delete-bulk" id="dist-bulk-delete" onclick="bulkDelete('distribution')">Delete Selected</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th class="col-checkbox"><input type="checkbox" id="dist-select-all" onclick="toggleSelectAll('distribution')"></th>
+                                    <th>
+                                        Name
+                                        <input type="text" class="filter-input" id="filter-dist-name" placeholder="Filter..." onkeyup="renderDistribution()">
+                                    </th>
+                                    <th>
+                                        Weight Given
+                                        <input type="text" class="filter-input" id="filter-dist-weight" placeholder="Filter..." onkeyup="renderDistribution()">
+                                    </th>
+                                    <th>
+                                        Date
+                                        <input type="date" class="filter-input" id="filter-dist-date" onchange="renderDistribution()">
+                                    </th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dist-tbody">
+                                <!-- Entries will be injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Module 5: Daily Summary -->
+            <section id="module-daily" class="module">
+                <header class="module-header">
+                    <h2>Daily Summary</h2>
+                    <p>Select a date to view the net gold left for that day.</p>
+                </header>
+
+                <div class="card summary-filter-card">
+                    <div class="form-group" style="max-width: 300px;">
+                        <label for="summary-date">Select Date</label>
+                        <input type="date" id="summary-date">
+                    </div>
+                </div>
+
+                <div class="summary-grid">
+                    <div class="summary-box">
+                        <div class="summary-label">Sum of 22ct Gold</div>
+                        <div class="summary-value" id="sum-22ct">0.00</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-label">Worker Loss</div>
+                        <div class="summary-value" id="sum-loss">- 0.00</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-label">Box Weight</div>
+                        <div class="summary-value" id="sum-box">+ 0.00</div>
+                    </div>
+                    <div class="summary-box">
+                        <div class="summary-label">Gold Distributed</div>
+                        <div class="summary-value" id="sum-dist">- 0.00</div>
+                    </div>
+                </div>
+                
+                <div class="final-totals-container" style="display: flex; gap: 24px; margin-top: 24px;">
+                    <!-- 22ct Final Block -->
+                    <div class="card final-summary-card" style="flex: 1;">
+                        <h3>Total 22 ct. Gold Left for <span id="display-summary-date-22">selected date</span></h3>
+                        <div class="huge-value" id="final-total">0.00 <span class="unit">grams</span></div>
+                        <p class="formula-hint">Formula: (22ct Gold) - (Worker Loss) + (Box Weight) - (Distribution)</p>
+                    </div>
+
+                    <!-- 24ct Final Block -->
+                    <div class="card final-summary-card" style="flex: 1;">
+                        <h3>Total 24 ct. Gold Left for <span id="display-summary-date-24">selected date</span></h3>
+                        <div class="huge-value" id="final-total-24">0.00 <span class="unit">grams</span></div>
+                        <p class="formula-hint">Formula: (Incoming 24ct) - (Gold Used 24ct)</p>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
