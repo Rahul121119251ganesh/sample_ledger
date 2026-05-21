@@ -61,11 +61,12 @@ async function loadStateFromCloud() {
 }
 
 // --- Custom Database Authentication ---
+// --- Authentication ---
 async function initAuth() {
-    // Check if session exists in browser storage
+    // Check if user session already exists locally to bypass login screen
     const savedUser = localStorage.getItem('app_user_session');
     if (savedUser) {
-        handleAuthChange(savedUser);
+        handleAuthChange({ user: { id: 'local-session', email: savedUser } });
     } else {
         handleAuthChange(null);
     }
@@ -73,69 +74,92 @@ async function initAuth() {
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const usernameInput = document.getElementById('login-username').value.trim();
-    const passwordInput = document.getElementById('login-password').value;
-    const errDiv = document.getElementById('login-error');
-    const submitBtn = document.getElementById('btn-login-submit');
-    
-    errDiv.style.display = 'none';
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Verifying...';
-
-    try {
-        console.log("Attempting login for:", usernameInput);
-
-        // Fetch the rows safely without filtering by a spaced column name
-        const { data, error } = await supabase
-            .from('app_users')
-            .select('*');
-
-        console.log("Supabase Error Status:", error);
-        console.log("Raw Database Rows Found:", data);
-
-        if (error || !data || data.length === 0) {
-            errDiv.textContent = "Database connection error or no users found.";
-            errDiv.style.display = 'block';
-            submitBtn.textContent = 'Login';
-            submitBtn.disabled = false;
-            return;
-        }
-
-        // Search through the rows matching both names dynamically case-insensitive/sensitive
-        const matchedUser = data.find(user => {
-            // Check all possible space/case combinations just to be 100% safe
-            const dbUsername = user['User name'] || user['username'] || user['Username'];
-            const dbPassword = user['Password'] || user['password'];
+            e.preventDefault();
             
-            return dbUsername === usernameInput && dbPassword === passwordInput;
+            // Map inputs to match your customized login interface fields
+            const usernameInput = document.getElementById('login-username')?.value.trim() || 
+                                  document.getElementById('login-email')?.value.trim();
+            const passwordInput = document.getElementById('login-password')?.value;
+            const errDiv = document.getElementById('login-error');
+            const submitBtn = document.getElementById('btn-login-submit');
+            
+            if (!usernameInput || !passwordInput) {
+                errDiv.textContent = "Please enter both username and password.";
+                errDiv.style.display = 'block';
+                return;
+            }
+
+            errDiv.style.display = 'none';
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Verifying...';
+
+            try {
+                console.log("Attempting login for:", usernameInput);
+
+                // Fetch raw entries securely to avoid SQL URL space parsing restrictions
+                const { data, error } = await supabase
+                    .from('app_users')
+                    .select('*');
+
+                console.log("Raw Database Rows Found:", data);
+
+                if (error || !data || data.length === 0) {
+                    errDiv.textContent = "Database connection error or no users configured.";
+                    errDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Login';
+                    return;
+                }
+
+                // Clean and check every column property to bypass trailing blank space bugs
+                const matchedUser = data.find(user => {
+                    let dbUsername = "";
+                    let dbPassword = "";
+
+                    Object.keys(user).forEach(key => {
+                        const cleanKey = key.trim().toLowerCase();
+                        if (cleanKey === 'user name' || cleanKey === 'username') {
+                            dbUsername = String(user[key]).trim();
+                        }
+                        if (cleanKey === 'password') {
+                            dbPassword = String(user[key]).trim(); // Trim spaces from password too
+                        }
+                    });
+
+                    return dbUsername === usernameInput && dbPassword === passwordInput;
+                });
+
+                if (!matchedUser) {
+                    errDiv.textContent = "Invalid username or password.";
+                    errDiv.style.display = 'block';
+                    submitBtn.textContent = 'Login';
+                    submitBtn.disabled = false;
+                } else {
+                    console.log("Success! Credentials matched perfectly.");
+                    
+                    let verifiedUsername = usernameInput;
+                    Object.keys(matchedUser).forEach(key => {
+                        if (key.trim().toLowerCase() === 'user name' || key.trim().toLowerCase() === 'username') {
+                            verifiedUsername = String(matchedUser[key]).trim();
+                        }
+                    });
+                    
+                    // Save mock session payload to satisfy handleAuthChange() tracking rules
+                    localStorage.setItem('app_user_session', verifiedUsername);
+                    handleAuthChange({ user: { id: 'local-session', email: verifiedUsername } });
+                    
+                    loginForm.reset();
+                    submitBtn.textContent = 'Login';
+                    submitBtn.disabled = false;
+                }
+            } catch (err) {
+                console.error("Critical routing breakdown:", err);
+                errDiv.textContent = "Connection error. Please try again.";
+                errDiv.style.display = 'block';
+                submitBtn.textContent = 'Login';
+                submitBtn.disabled = false;
+            }
         });
-
-        if (!matchedUser) {
-            errDiv.textContent = "Invalid username or password.";
-            errDiv.style.display = 'block';
-            submitBtn.textContent = 'Login';
-            submitBtn.disabled = false;
-        } else {
-            console.log("Login verified successfully! Routing to dashboard...");
-            
-            // Get the username string safely
-            const finalUser = matchedUser['User name'] || matchedUser['username'] || matchedUser['Username'];
-            
-            localStorage.setItem('app_user_session', finalUser);
-            handleAuthChange(finalUser);
-            loginForm.reset();
-            submitBtn.textContent = 'Login';
-            submitBtn.disabled = false;
-        }
-    } catch (err) {
-        console.error("Critical routing crash:", err);
-        errDiv.textContent = "Connection error. Please try again.";
-        errDiv.style.display = 'block';
-        submitBtn.textContent = 'Login';
-        submitBtn.disabled = false;
-    }
-});
     }
 
     const btnLogout = document.getElementById('btn-logout');
@@ -144,6 +168,33 @@ async function initAuth() {
             localStorage.removeItem('app_user_session');
             handleAuthChange(null);
         });
+    }
+}
+
+async function handleAuthChange(session) {
+    currentUser = session?.user || null;
+    const sidebar = document.getElementById('app-sidebar');
+    const mainContent = document.getElementById('app-main-content');
+    const loginModule = document.getElementById('module-login');
+    const defaultModule = document.getElementById('module-outgoing');
+    const allModules = document.querySelectorAll('.module');
+    
+    if (currentUser) {
+        if (sidebar) sidebar.style.display = 'flex';
+        allModules.forEach(m => m.classList.remove('active'));
+        if (loginModule) loginModule.classList.remove('active');
+        if (defaultModule) defaultModule.classList.add('active');
+        
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector('[data-target="module-outgoing"]')?.classList.add('active');
+        
+        // Load data safely
+        await loadStateFromCloud();
+    } else {
+        if (sidebar) sidebar.style.display = 'none';
+        allModules.forEach(m => m.classList.remove('active'));
+        if (loginModule) loginModule.classList.add('active');
+        state = { incoming: [], conversions: [], losses: [], boxStarts: [], boxRemovals: [], distribution: [], suggestions: { purposes: [], workers: [], boxes: [], names: [] } };
     }
 }
 
