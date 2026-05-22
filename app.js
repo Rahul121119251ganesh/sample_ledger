@@ -180,33 +180,39 @@ async function handleAuthChange(session) {
     const mainContent = document.getElementById('app-main-content');
     const loginModule = document.getElementById('module-login');
     
-    // Safely handles both 'module-outgoing-gold' and 'module-outgoing' names
+    // 1. Safely locate either 'module-outgoing-gold' or 'module-outgoing' to handle variations
     const defaultModule = document.getElementById('module-outgoing-gold') || document.getElementById('module-outgoing');
     const allModules = document.querySelectorAll('.module');
     
     if (currentUser) {
+        // 2. Reveal the core layout frames
         if (sidebar) sidebar.style.display = 'flex';
         if (mainContent) mainContent.style.display = 'block';
         
+        // 3. Clear existing active view modules and hide the login card
         allModules.forEach(m => m.classList.remove('active'));
-        if (loginModule) loginModule.style.display = 'none';
-        if (loginModule) loginModule.classList.remove('active');
+        if (loginModule) {
+            loginModule.style.display = 'none';
+            loginModule.classList.remove('active');
+        }
         
-        // Safety check to prevent the classList crash
+        // 4. Critical safety check to prevent classList runtime crashes
         if (defaultModule) {
             defaultModule.classList.add('active');
         } else {
             console.warn("Could not find default module panel element to display.");
         }
         
+        // 5. Highlight the sidebar navigation button actively
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        
         const defaultNavBtn = document.querySelector('[data-target="module-outgoing"]') || 
                                document.querySelector('[data-target="module-outgoing-gold"]');
         if (defaultNavBtn) defaultNavBtn.classList.add('active');
         
+        // 6. Sync active ledger records safely from cloud storage
         await loadStateFromCloud();
     } else {
+        // If logged out, reset visibility and clear local state memory cache
         if (sidebar) sidebar.style.display = 'none';
         if (mainContent) mainContent.style.display = 'none';
         allModules.forEach(m => m.classList.remove('active'));
