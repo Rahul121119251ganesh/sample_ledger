@@ -1,9 +1,9 @@
-const SUPABASE_URL = 'https://iojcfzxwafdbnhxfgffe.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvamNmenh3YWZkYm5oeGZnZmZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzYyOTcsImV4cCI6MjA5NDg1MjI5N30.2Ao6_cxFev400bf8MB8831zUdcihsKIwdhw_ezFPFlE';
-window.supabaseClient = window.supabaseClient || 
-    window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase2_URL = 'https://iojcfzxwafdbnhxfgffe.supabase.co';
+const supabase2_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvamNmenh3YWZkYm5oeGZnZmZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzYyOTcsImV4cCI6MjA5NDg1MjI5N30.2Ao6_cxFev400bf8MB8831zUdcihsKIwdhw_ezFPFlE';
+window.supabase2Client = window.supabase2Client || 
+    window.supabase2.createClient(supabase2_URL, supabase2_ANON_KEY);
 
-const supabase = window.supabaseClient;
+const supabase2 = window.supabase2Client;
 let currentUser = null; // Stores the logged-in username string
 
 // --- State Management ---
@@ -29,12 +29,12 @@ async function loadStateFromCloud() {
     if (!currentUser) return;
     try {
         const [inc, conv, loss, bStarts, bRems, dist] = await Promise.all([
-            supabase.from('incoming').select('*'),
-            supabase.from('conversions').select('*'),
-            supabase.from('losses').select('*'),
-            supabase.from('box_starts').select('*'),
-            supabase.from('box_removals').select('*'),
-            supabase.from('distributions').select('*') // Handled table name synchronization
+            supabase22.from('incoming').select('*'),
+            supabase2.from('conversions').select('*'),
+            supabase2.from('losses').select('*'),
+            supabase2.from('box_starts').select('*'),
+            supabase2.from('box_removals').select('*'),
+            supabase2.from('distributions').select('*') // Handled table name synchronization
         ]);
         
         state.incoming = inc.data || [];
@@ -59,7 +59,7 @@ async function loadStateFromCloud() {
         if(window.renderDistribution) window.renderDistribution();
         if(document.getElementById('module-daily').classList.contains('active')) updateDailySummary();
     } catch (e) {
-        console.error("Error loading state from Supabase", e);
+        console.error("Error loading state from supabase2", e);
     }
 }
 
@@ -100,7 +100,7 @@ async function initAuth() {
                 console.log("Attempting login for:", usernameInput);
 
                 // Fetch raw entries securely to avoid SQL URL space parsing restrictions
-                const { data, error } = await supabase
+                const { data, error } = await supabase2
                     .from('app_users')
                     .select('*');
 
@@ -378,7 +378,7 @@ window.bulkDelete = async function(moduleKey) {
     const idsToDelete = indicesToDelete.map(index => state[stateArrayName][index].id);
 
     try {
-        const { error } = await supabase.from(tableName).delete().in('id', idsToDelete);
+        const { error } = await supabase2.from(tableName).delete().in('id', idsToDelete);
         if (error) throw error;
         
         indicesToDelete.forEach(index => {
@@ -456,12 +456,12 @@ function initIncoming() {
 
         if (editId > -1) {
             const dbId = state.incoming[editId].id;
-            const { data } = await supabase.from('incoming').update({ weight24, date }).eq('id', dbId).select();
+            const { data } = await supabase2.from('incoming').update({ weight24, date }).eq('id', dbId).select();
             if(data) state.incoming[editId] = data;
             editIdInput.value = "-1";
             setEditMode('incoming-form', 'inc-submit-btn', false);
         } else {
-            const { data } = await supabase.from('incoming').insert({ weight24, date, username: currentUser }).select();
+            const { data } = await supabase2.from('incoming').insert({ weight24, date, username: currentUser }).select();
             if(data) state.incoming.push(data);
         }
 
@@ -549,12 +549,12 @@ function initOutgoing() {
 
         if (editId > -1) {
             const dbId = state.conversions[editId].id;
-            const { data } = await supabase.from('conversions').update({ purpose, weight24, weight22, date }).eq('id', dbId).select();
+            const { data } = await supabase2.from('conversions').update({ purpose, weight24, weight22, date }).eq('id', dbId).select();
             if(data) state.conversions[editId] = data;
             editIdInput.value = "-1";
             setEditMode('outgoing-form', 'conv-submit-btn', false);
         } else {
-            const { data } = await supabase.from('conversions').insert({ purpose, weight24, weight22, date, username: currentUser }).select();
+            const { data } = await supabase2.from('conversions').insert({ purpose, weight24, weight22, date, username: currentUser }).select();
             if(data) state.conversions.push(data);
         }
 
@@ -639,12 +639,12 @@ function initLoss() {
 
         if (editId > -1) {
             const dbId = state.losses[editId].id;
-            const { data } = await supabase.from('losses').update({ worker, amount, date }).eq('id', dbId).select();
+            const { data } = await supabase2.from('losses').update({ worker, amount, date }).eq('id', dbId).select();
             if(data) state.losses[editId] = data;
             editIdInput.value = "-1";
             setEditMode('loss-form', 'loss-submit-btn', false);
         } else {
-            const { data } = await supabase.from('losses').insert({ worker, amount, date, username: currentUser }).select();
+            const { data } = await supabase2.from('losses').insert({ worker, amount, date, username: currentUser }).select();
             if(data) state.losses.push(data);
         }
 
@@ -712,7 +712,7 @@ window.deleteStartOverride = async function(box, date) {
     const index = state.boxStarts.findIndex(s => s.box === box && s.date === date);
     if (index > -1) {
         const dbId = state.boxStarts[index].id;
-        await supabase.from('box_starts').delete().eq('id', dbId);
+        await supabase2.from('box_starts').delete().eq('id', dbId);
         state.boxStarts.splice(index, 1);
         renderInventoryModule();
         updateDailySummary();
@@ -808,7 +808,7 @@ function initInventory() {
 
             if (editId > -1) {
                 const dbId = state.boxStarts[editId].id;
-                const { data } = await supabase.from('box_starts').update({ box, weight, date }).eq('id', dbId).select();
+                const { data } = await supabase2.from('box_starts').update({ box, weight, date }).eq('id', dbId).select();
                 if(data) state.boxStarts[editId] = data;
                 document.getElementById('inv-start-edit-id').value = "-1";
                 setEditMode('inv-start-form', 'inv-start-submit-btn', false);
@@ -817,10 +817,10 @@ function initInventory() {
                 if (existingIndex > -1) {
                     const newWeight = state.boxStarts[existingIndex].weight + weight;
                     const dbId = state.boxStarts[existingIndex].id;
-                    const { data } = await supabase.from('box_starts').update({ weight: newWeight }).eq('id', dbId).select();
+                    const { data } = await supabase2.from('box_starts').update({ weight: newWeight }).eq('id', dbId).select();
                     if(data) state.boxStarts[existingIndex] = data;
                 } else {
-                    const { data } = await supabase.from('box_starts').insert({ box, weight, date, username: currentUser }).select();
+                    const { data } = await supabase2.from('box_starts').insert({ box, weight, date, username: currentUser }).select();
                     if(data) state.boxStarts.push(data);
                 }
             }
@@ -843,12 +843,12 @@ function initInventory() {
 
             if (editId > -1) {
                 const dbId = state.boxRemovals[editId].id;
-                const { data } = await supabase.from('box_removals').update({ box, weight, date }).eq('id', dbId).select();
+                const { data } = await supabase2.from('box_removals').update({ box, weight, date }).eq('id', dbId).select();
                 if(data) state.boxRemovals[editId] = data;
                 document.getElementById('inv-rem-edit-id').value = "-1";
                 setEditMode('inv-rem-form', 'inv-rem-submit-btn', false);
             } else {
-                const { data } = await supabase.from('box_removals').insert({ box, weight, date, username: currentUser }).select();
+                const { data } = await supabase2.from('box_removals').insert({ box, weight, date, username: currentUser }).select();
                 if(data) state.boxRemovals.push(data);
             }
             renderInventoryModule();
@@ -921,12 +921,12 @@ function initDistribution() {
 
         if (editId > -1) {
             const dbId = state.distribution[editId].id;
-            const { data } = await supabase.from('distributions').update({ name, weight, date }).eq('id', dbId).select();
+            const { data } = await supabase2.from('distributions').update({ name, weight, date }).eq('id', dbId).select();
             if(data) state.distribution[editId] = data;
             editIdInput.value = "-1";
             setEditMode('dist-form', 'dist-submit-btn', false);
         } else {
-            const { data } = await supabase.from('distributions').insert({ name, weight, date, username: currentUser }).select();
+            const { data } = await supabase2.from('distributions').insert({ name, weight, date, username: currentUser }).select();
             if(data) state.distribution.push(data);
         }
 
