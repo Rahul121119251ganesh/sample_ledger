@@ -22,41 +22,78 @@ let selections = {
     distribution: new Set()
 };
 
+// --- Database Sync (Supabase) ---
 async function loadStateFromCloud() {
     if (!currentUser) return;
     try {
-        const [inc, conv, loss, bStarts, bRems, dist] = await Promise.all([
-            supabase22.from('incoming').select('*'),
+        // Updated client instance target to handle your declared 'supabase2' variable name safely
+        const [inc, conv, loss, bStart, bRem, dist] = await Promise.all([
+            supabase2.from('incoming').select('*'),
             supabase2.from('conversions').select('*'),
             supabase2.from('losses').select('*'),
             supabase2.from('box_starts').select('*'),
             supabase2.from('box_removals').select('*'),
-            supabase2.from('distributions').select('*') // Handled table name synchronization
+            supabase2.from('distribution').select('*')
         ]);
-        
+
+        if (inc.error) throw inc.error;
+        if (conv.error) throw conv.error;
+        if (loss.error) throw loss.error;
+        if (bStart.error) throw bStart.error;
+        if (bRem.error) throw bRem.error;
+        if (dist.error) throw dist.error;
+
         state.incoming = inc.data || [];
         state.conversions = conv.data || [];
         state.losses = loss.data || [];
-        state.boxStarts = bStarts.data || [];
-        state.boxRemovals = bRems.data || [];
+        state.boxStarts = bStart.data || [];
+        state.boxRemovals = bRem.data || [];
         state.distribution = dist.data || [];
 
-        state.suggestions = { purposes: [], workers: [], boxes: [], names: [] };
-        state.conversions.forEach(c => addSuggestion('purposes', c.purpose));
-        state.losses.forEach(l => addSuggestion('workers', l.worker));
-        state.boxStarts.forEach(s => addSuggestion('boxes', s.box));
-        state.boxRemovals.forEach(r => addSuggestion('boxes', r.box));
-        state.distribution.forEach(d => addSuggestion('names', d.name));
-        populateDatalists();
-        
-        if(window.renderIncoming) window.renderIncoming();
-        if(window.renderOutgoing) window.renderOutgoing();
-        if(window.renderLoss) window.renderLoss();
-        if(window.renderInventoryModule) window.renderInventoryModule();
-        if(window.renderDistribution) window.renderDistribution();
-        if(document.getElementById('module-daily').classList.contains('active')) updateDailySummary();
-    } catch (e) {
-        console.error("Error loading state from supabase2", e);
+        console.log("Data synced down successfully from Supabase:", state);
+
+        // Force UI views to draw the newly loaded records immediately
+        updateSuggestions();
+        renderAllTables();
+        updateSummary();
+
+    } catch (err) {
+        console.error("Error reading database tables:", err.message);
+    }
+}
+
+async function addItemToCloud(table, item) {
+    if (!currentUser) return;
+    try {
+        // Enforce supabase2 usage for row additions
+        const { data, error } = await supabase2
+            .from(table)
+            .insert([item])
+            .select();
+
+        if (error) throw error;
+        console.log(`Successfully added record to ${table}:`, data);
+        return data;
+    } catch (err) {
+        console.error(`Failed to push record to ${table}:`, err.message);
+        alert(`Error saving entry: ${err.message}`);
+    }
+}
+
+async function deleteItemsFromCloud(table, idsArray) {
+    if (!currentUser || !idsArray || idsArray.length === 0) return;
+    try {
+        // Enforce supabase2 usage for record removal pipelines
+        const { error } = await supabase2
+            .from(table)
+            .delete()
+            .in('id', idsArray);
+
+        if (error) throw error;
+        console.log(`Successfully wiped items from ${table}:`, idsArray);
+    } catch (err) {
+        console.error(`Failed execution sequence on ${table}:`, err.message);
+        alert(`Deletion error: ${err.message}`);
     }
 }
 
