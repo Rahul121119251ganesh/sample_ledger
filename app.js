@@ -62,8 +62,8 @@ async function loadStateFromCloud() {
 
 // --- Custom Database Authentication ---
 // --- Authentication ---
+// --- Authentication ---
 async function initAuth() {
-    // Check if user session already exists locally to bypass login screen
     const savedUser = localStorage.getItem('app_user_session');
     if (savedUser) {
         handleAuthChange({ user: { id: 'local-session', email: savedUser } });
@@ -76,7 +76,6 @@ async function initAuth() {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            // Map inputs to match your customized login interface fields
             const usernameInput = document.getElementById('login-username')?.value.trim() || 
                                   document.getElementById('login-email')?.value.trim();
             const passwordInput = document.getElementById('login-password')?.value;
@@ -84,34 +83,36 @@ async function initAuth() {
             const submitBtn = document.getElementById('btn-login-submit');
             
             if (!usernameInput || !passwordInput) {
-                errDiv.textContent = "Please enter both username and password.";
-                errDiv.style.display = 'block';
+                if (errDiv) {
+                    errDiv.textContent = "Please enter both username and password.";
+                    errDiv.style.display = 'block';
+                }
                 return;
             }
 
-            errDiv.style.display = 'none';
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Verifying...';
+            if (errDiv) errDiv.style.display = 'none';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Verifying...';
+            }
 
             try {
                 console.log("Attempting login for:", usernameInput);
 
-                // Fetch raw entries securely to avoid SQL URL space parsing restrictions
-                const { data, error } = await supabase2
-                    .from('app_users')
-                    .select('*');
-
-                console.log("Raw Database Rows Found:", data);
+                const { data, error } = await supabase2.from('app_users').select('*');
 
                 if (error || !data || data.length === 0) {
-                    errDiv.textContent = "Database connection error or no users configured.";
-                    errDiv.style.display = 'block';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Login';
+                    if (errDiv) {
+                        errDiv.textContent = "Database connection error or no users configured.";
+                        errDiv.style.display = 'block';
+                    }
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Login';
+                    }
                     return;
                 }
 
-                // Clean and check every column property to bypass trailing blank space bugs
                 const matchedUser = data.find(user => {
                     let dbUsername = "";
                     let dbPassword = "";
@@ -122,7 +123,7 @@ async function initAuth() {
                             dbUsername = String(user[key]).trim();
                         }
                         if (cleanKey === 'password') {
-                            dbPassword = String(user[key]).trim(); // Trim spaces from password too
+                            dbPassword = String(user[key]).trim();
                         }
                     });
 
@@ -130,13 +131,15 @@ async function initAuth() {
                 });
 
                 if (!matchedUser) {
-                    errDiv.textContent = "Invalid username or password.";
-                    errDiv.style.display = 'block';
-                    submitBtn.textContent = 'Login';
-                    submitBtn.disabled = false;
+                    if (errDiv) {
+                        errDiv.textContent = "Invalid username or password.";
+                        errDiv.style.display = 'block';
+                    }
+                    if (submitBtn) {
+                        submitBtn.textContent = 'Login';
+                        submitBtn.disabled = false;
+                    }
                 } else {
-                    console.log("Success! Credentials matched perfectly.");
-                    
                     let verifiedUsername = usernameInput;
                     Object.keys(matchedUser).forEach(key => {
                         if (key.trim().toLowerCase() === 'user name' || key.trim().toLowerCase() === 'username') {
@@ -144,20 +147,25 @@ async function initAuth() {
                         }
                     });
                     
-                    // Save mock session payload to satisfy handleAuthChange() tracking rules
                     localStorage.setItem('app_user_session', verifiedUsername);
                     handleAuthChange({ user: { id: 'local-session', email: verifiedUsername } });
                     
-                    loginForm.reset();
-                    submitBtn.textContent = 'Login';
-                    submitBtn.disabled = false;
+                    if (loginForm) loginForm.reset();
+                    if (submitBtn) {
+                        submitBtn.textContent = 'Login';
+                        submitBtn.disabled = false;
+                    }
                 }
             } catch (err) {
                 console.error("Critical routing breakdown:", err);
-                errDiv.textContent = "Connection error. Please try again.";
-                errDiv.style.display = 'block';
-                submitBtn.textContent = 'Login';
-                submitBtn.disabled = false;
+                if (errDiv) {
+                    errDiv.textContent = "Connection error. Please try again.";
+                    errDiv.style.display = 'block';
+                }
+                if (submitBtn) {
+                    submitBtn.textContent = 'Login';
+                    submitBtn.disabled = false;
+                }
             }
         });
     }
@@ -177,46 +185,40 @@ async function handleAuthChange(session) {
     const mainContent = document.getElementById('app-main-content');
     const loginModule = document.getElementById('module-login');
     
-    // 1. Safely locate either 'module-outgoing-gold' or 'module-outgoing' to handle variations
-    const defaultModule = document.getElementById('module-outgoing-gold') || document.getElementById('module-outgoing');
+    // Look for valid module containers present in your HTML markup
+    const defaultModule = document.getElementById('module-incoming') || document.querySelector('.module:not(#module-login)');
     const allModules = document.querySelectorAll('.module');
     
     if (currentUser) {
-        // 2. Reveal the core layout frames
         if (sidebar) sidebar.style.display = 'flex';
         if (mainContent) mainContent.style.display = 'block';
         
-        // 3. Clear existing active view modules and hide the login card
         allModules.forEach(m => m.classList.remove('active'));
         if (loginModule) {
             loginModule.style.display = 'none';
             loginModule.classList.remove('active');
         }
         
-        // 4. Critical safety check to prevent classList runtime crashes
         if (defaultModule) {
             defaultModule.classList.add('active');
-        } else {
-            console.warn("Could not find default module panel element to display.");
         }
         
-        // 5. Highlight the sidebar navigation button actively
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        const defaultNavBtn = document.querySelector('[data-target="module-outgoing"]') || 
-                               document.querySelector('[data-target="module-outgoing-gold"]');
+        const defaultNavBtn = document.querySelector('[data-target="module-incoming"]');
         if (defaultNavBtn) defaultNavBtn.classList.add('active');
         
-        // 6. Sync active ledger records safely from cloud storage
         await loadStateFromCloud();
     } else {
-        // If logged out, reset visibility and clear local state memory cache
+        // Logged out / initial view: Hide workspace frames, force render the login window frame
         if (sidebar) sidebar.style.display = 'none';
-        if (mainContent) mainContent.style.display = 'none';
+        if (mainContent) mainContent.style.display = 'block'; 
+        
         allModules.forEach(m => m.classList.remove('active'));
         if (loginModule) {
             loginModule.style.display = 'block';
             loginModule.classList.add('active');
         }
+        
         state = { incoming: [], conversions: [], losses: [], boxStarts: [], boxRemovals: [], distribution: [], suggestions: { purposes: [], workers: [], boxes: [], names: [] } };
     }
 }
