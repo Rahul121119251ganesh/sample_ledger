@@ -73,30 +73,28 @@
         <main class="main-content" id="app-main-content">
             
             <!-- Module: Login (Auth) -->
-            <section id="module-login" class="module active">
-    <div class="login-card">
-        <div class="login-header">
-            <i class="ph-fill ph-sketch-logo brand-icon"></i>
-            <h1>Heena Jewellery Works</h1>
-            <br>
-            <p>Access Ledger</p>
+            <section id="module-login" class="module active" style="display: flex; justify-content: center; align-items: center; min-height: 80vh;">
+    <div class="card login-container" style="max-width: 400px; width: 100%;">
+        <div class="brand" style="justify-content: center; border-bottom: none; margin-bottom: 16px; padding: 0;">
+            <i class="ph-fill ph-sketch-logo brand-icon" style="font-size: 40px;"></i>
         </div>
-        <br>
-        <form id="login-form">
+        <h2 style="text-align: center; color: var(--accent-color); margin-bottom: 8px;">Heena Jewellery Works</h2>
+        <p style="text-align: center; color: var(--text-secondary); margin-bottom: 32px;">Secure Ledger Access</p>
+        
+        <form id="login-form" class="input-form" style="display: flex; flex-direction: column;">
             <div class="form-group">
-                
                 <label for="login-username">Username</label>
-                <input type="text" id="login-username" placeholder="Enter username" required>
+                <input type="text" id="login-username" required="" placeholder="Enter Username">
             </div>
-            <br>
             <div class="form-group">
-                
                 <label for="login-password">Password</label>
-                <input type="password" id="login-password" placeholder="Enter password" required>
+                <input type="password" id="login-password" required="" placeholder="Enter Password">
             </div>
-            <br>
             <div id="login-error" class="error-message" style="display: none;"></div>
             <button type="submit" class="btn btn-primary btn-block" id="btn-login-submit">Login</button>
+        </form>
+    </div>
+</section>
         </form>
     </div>
 </section>
