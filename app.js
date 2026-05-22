@@ -1,9 +1,6 @@
 const supabase2_URL = 'https://iojcfzxwafdbnhxfgffe.supabase.co';
 const supabase2_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvamNmenh3YWZkYm5oeGZnZmZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzYyOTcsImV4cCI6MjA5NDg1MjI5N30.2Ao6_cxFev400bf8MB8831zUdcihsKIwdhw_ezFPFlE';
-window.supabase2Client = window.supabase2Client || 
-    window.supabase2.createClient(supabase2_URL, supabase2_ANON_KEY);
-
-const supabase2 = window.supabase2Client;
+const supabase = window.supabase.createClient(supabase2_URL, supabase2_ANON_KEY);
 let currentUser = null; // Stores the logged-in username string
 
 // --- State Management ---
