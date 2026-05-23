@@ -26,7 +26,7 @@ async function loadStateFromCloud() {
     if (!currentUser) return;
     try {
         const [inc, conv, loss, bStarts, bRems, dist] = await Promise.all([
-            supabase22.from('incoming').select('*'),
+            supabase2.from('incoming').select('*'),
             supabase2.from('conversions').select('*'),
             supabase2.from('losses').select('*'),
             supabase2.from('box_starts').select('*'),
