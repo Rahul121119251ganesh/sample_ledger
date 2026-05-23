@@ -222,13 +222,16 @@ async function handleAuthChange(session) {
     const mainContent = document.getElementById('app-main-content');
     const loginModule = document.getElementById('module-login');
     
-    // Look for valid module containers present in your HTML markup
     const defaultModule = document.getElementById('module-incoming') || document.querySelector('.module:not(#module-login)');
     const allModules = document.querySelectorAll('.module');
     
     if (currentUser) {
+        // --- User is logged in: Restore clean layout rules ---
         if (sidebar) sidebar.style.display = 'flex';
-        if (mainContent) mainContent.style.display = 'block';
+        
+        // CRITICAL FIX: Do NOT use 'block'. Remove the inline display style completely 
+        // so that the browser reverts to your CSS layout defaults seamlessly!
+        if (mainContent) mainContent.style.display = ''; 
         
         allModules.forEach(m => m.classList.remove('active'));
         if (loginModule) {
@@ -246,9 +249,9 @@ async function handleAuthChange(session) {
         
         await loadStateFromCloud();
     } else {
-        // Logged out / initial view: Hide workspace frames, force render the login window frame
+        // --- User is logged out ---
         if (sidebar) sidebar.style.display = 'none';
-        if (mainContent) mainContent.style.display = 'block'; 
+        if (mainContent) mainContent.style.display = 'block'; // Block is safe here when sidebar is hidden
         
         allModules.forEach(m => m.classList.remove('active'));
         if (loginModule) {
