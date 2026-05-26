@@ -62,7 +62,14 @@
                 </li>
             </ul>
             
-            <div class="sidebar-footer" style="margin-top: auto; padding: 16px;">
+            <div class="sidebar-footer" style="margin-top: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; border-top: 1px solid var(--border-color);">
+                <div class="active-user-badge" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: rgba(212, 175, 55, 0.08); border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+                    <i class="ph ph-user-circle" style="font-size: 24px; color: var(--accent-color);"></i>
+                    <div style="display: flex; flex-direction: column; line-height: 1.2;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Active User</span>
+                        <span id="active-username" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary);">Guest</span>
+                    </div>
+                </div>
                 <button id="btn-logout" class="btn-secondary" style="width: 100%; justify-content: center; color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">
                     <i class="ph ph-sign-out"></i> Logout
                 </button>
