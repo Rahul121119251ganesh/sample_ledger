@@ -225,7 +225,7 @@ body {
     font-weight: 500;
 }
 
-input[type="text"], input[type="number"], input[type="date"] {
+input[type="text"], input[type="password"], input[type="number"], input[type="date"] {
     background: rgba(0, 0, 0, 0.5);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
