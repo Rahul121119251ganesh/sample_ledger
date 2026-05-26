@@ -180,10 +180,15 @@ async function initAuth() {
 }
 
 async function handleAuthChange(session) {
-    currentUser = session?.user || null;
+    currentUser = session?.user?.email || null;
     const sidebar = document.getElementById('app-sidebar');
     const mainContent = document.getElementById('app-main-content');
     const loginModule = document.getElementById('module-login');
+    
+    const activeUserEl = document.getElementById('active-username');
+    if (activeUserEl) {
+        activeUserEl.textContent = currentUser || 'Guest';
+    }
     
     // Look for valid module containers present in your HTML markup
     const defaultModule = document.getElementById('module-incoming') || document.querySelector('.module:not(#module-login)');
@@ -256,6 +261,7 @@ function addSuggestion(type, value) {
     if(!value) return;
     if(!state.suggestions[type].includes(value)) {
         state.suggestions[type].push(value);
+        populateDatalists();
     }
 }
 
@@ -297,17 +303,23 @@ function initNavigation() {
 }
 
 // --- Bulk Action Logic ---
+function getSelectAllCheckboxId(moduleKey) {
+    if (moduleKey === 'outgoing') return 'out-select-all';
+    if (moduleKey === 'invRem') return 'invRem-select-all';
+    if (moduleKey === 'loss') return 'loss-select-all';
+    if (moduleKey === 'distribution') return 'dist-select-all';
+    if (moduleKey === 'incoming') return 'inc-select-all';
+    return `${moduleKey}-select-all`;
+}
+
 window.toggleEditMode = function(moduleKey) {
-    const tableCard = document.getElementById(`tc-${moduleKey}`);
+    const tableCardId = moduleKey === 'invRem' ? 'tc-inv-rem' : `tc-${moduleKey}`;
+    const tableCard = document.getElementById(tableCardId);
     if(!tableCard) return;
     if (tableCard.classList.contains('edit-mode-active')) {
         tableCard.classList.remove('edit-mode-active');
         selections[moduleKey].clear();
-        const checkbox = document.getElementById(
-            moduleKey === 'outgoing' ? 'out-select-all' : 
-            moduleKey === 'invRem' ? 'invRem-select-all' : 
-            `${moduleKey.substring(0,3)}-select-all`
-        );
+        const checkbox = document.getElementById(getSelectAllCheckboxId(moduleKey));
         if(checkbox) checkbox.checked = false;
         
         if (moduleKey === 'invRem') renderInventoryModule();
@@ -318,11 +330,7 @@ window.toggleEditMode = function(moduleKey) {
 }
 
 window.toggleSelectAll = function(moduleKey) {
-    const checkbox = document.getElementById(
-        moduleKey === 'outgoing' ? 'out-select-all' : 
-        moduleKey === 'invRem' ? 'invRem-select-all' : 
-        `${moduleKey.substring(0,3)}-select-all`
-    );
+    const checkbox = document.getElementById(getSelectAllCheckboxId(moduleKey));
     const isChecked = checkbox ? checkbox.checked : false;
     const renderedIndices = window[`${moduleKey}RenderedIndices`] || [];
     
@@ -343,11 +351,7 @@ window.toggleSelect = function(moduleKey, index) {
         selections[moduleKey].add(index);
     }
     
-    const checkbox = document.getElementById(
-        moduleKey === 'outgoing' ? 'out-select-all' : 
-        moduleKey === 'invRem' ? 'invRem-select-all' : 
-        `${moduleKey.substring(0,3)}-select-all`
-    );
+    const checkbox = document.getElementById(getSelectAllCheckboxId(moduleKey));
     const renderedIndices = window[`${moduleKey}RenderedIndices`] || [];
     
     if (checkbox && renderedIndices.length > 0 && renderedIndices.every(idx => selections[moduleKey].has(idx))) {
@@ -365,6 +369,7 @@ window.bulkDelete = async function(moduleKey) {
     const stateArrayName = 
         moduleKey === 'outgoing' ? 'conversions' : 
         moduleKey === 'invRem' ? 'boxRemovals' : 
+        moduleKey === 'loss' ? 'losses' : 
         moduleKey;
         
     const tableName = 
@@ -386,11 +391,7 @@ window.bulkDelete = async function(moduleKey) {
 
         selections[moduleKey].clear();
         
-        const selectAllCb = document.getElementById(
-            moduleKey === 'outgoing' ? 'out-select-all' : 
-            moduleKey === 'invRem' ? 'invRem-select-all' : 
-            `${moduleKey.substring(0,3)}-select-all`
-        );
+        const selectAllCb = document.getElementById(getSelectAllCheckboxId(moduleKey));
         if(selectAllCb) selectAllCb.checked = false;
 
         if (moduleKey === 'invRem') renderInventoryModule();
@@ -456,12 +457,12 @@ function initIncoming() {
         if (editId > -1) {
             const dbId = state.incoming[editId].id;
             const { data } = await supabase2.from('incoming').update({ weight24, date }).eq('id', dbId).select();
-            if(data) state.incoming[editId] = data;
+            if(data) state.incoming[editId] = data[0];
             editIdInput.value = "-1";
             setEditMode('incoming-form', 'inc-submit-btn', false);
         } else {
             const { data } = await supabase2.from('incoming').insert({ weight24, date, username: currentUser }).select();
-            if(data) state.incoming.push(data);
+            if(data) state.incoming.push(data[0]);
         }
 
         renderIncoming();
@@ -549,12 +550,12 @@ function initOutgoing() {
         if (editId > -1) {
             const dbId = state.conversions[editId].id;
             const { data } = await supabase2.from('conversions').update({ purpose, weight24, weight22, date }).eq('id', dbId).select();
-            if(data) state.conversions[editId] = data;
+            if(data) state.conversions[editId] = data[0];
             editIdInput.value = "-1";
             setEditMode('outgoing-form', 'conv-submit-btn', false);
         } else {
             const { data } = await supabase2.from('conversions').insert({ purpose, weight24, weight22, date, username: currentUser }).select();
-            if(data) state.conversions.push(data);
+            if(data) state.conversions.push(data[0]);
         }
 
         renderOutgoing();
@@ -639,12 +640,12 @@ function initLoss() {
         if (editId > -1) {
             const dbId = state.losses[editId].id;
             const { data } = await supabase2.from('losses').update({ worker, amount, date }).eq('id', dbId).select();
-            if(data) state.losses[editId] = data;
+            if(data) state.losses[editId] = data[0];
             editIdInput.value = "-1";
             setEditMode('loss-form', 'loss-submit-btn', false);
         } else {
             const { data } = await supabase2.from('losses').insert({ worker, amount, date, username: currentUser }).select();
-            if(data) state.losses.push(data);
+            if(data) state.losses.push(data[0]);
         }
 
         renderLoss();
@@ -687,7 +688,7 @@ function getCalculatedStartWeights(targetDate) {
         }
         
         starts.sort((a, b) => b.date.localeCompare(a.date));
-        const latestStart = starts;
+        const latestStart = starts[0];
         
         const startDate = latestStart.date;
         const startWeight = latestStart.weight;
@@ -808,7 +809,7 @@ function initInventory() {
             if (editId > -1) {
                 const dbId = state.boxStarts[editId].id;
                 const { data } = await supabase2.from('box_starts').update({ box, weight, date }).eq('id', dbId).select();
-                if(data) state.boxStarts[editId] = data;
+                if(data) state.boxStarts[editId] = data[0];
                 document.getElementById('inv-start-edit-id').value = "-1";
                 setEditMode('inv-start-form', 'inv-start-submit-btn', false);
             } else {
@@ -817,10 +818,10 @@ function initInventory() {
                     const newWeight = state.boxStarts[existingIndex].weight + weight;
                     const dbId = state.boxStarts[existingIndex].id;
                     const { data } = await supabase2.from('box_starts').update({ weight: newWeight }).eq('id', dbId).select();
-                    if(data) state.boxStarts[existingIndex] = data;
+                    if(data) state.boxStarts[existingIndex] = data[0];
                 } else {
                     const { data } = await supabase2.from('box_starts').insert({ box, weight, date, username: currentUser }).select();
-                    if(data) state.boxStarts.push(data);
+                    if(data) state.boxStarts.push(data[0]);
                 }
             }
             renderInventoryModule();
@@ -843,12 +844,12 @@ function initInventory() {
             if (editId > -1) {
                 const dbId = state.boxRemovals[editId].id;
                 const { data } = await supabase2.from('box_removals').update({ box, weight, date }).eq('id', dbId).select();
-                if(data) state.boxRemovals[editId] = data;
+                if(data) state.boxRemovals[editId] = data[0];
                 document.getElementById('inv-rem-edit-id').value = "-1";
                 setEditMode('inv-rem-form', 'inv-rem-submit-btn', false);
             } else {
                 const { data } = await supabase2.from('box_removals').insert({ box, weight, date, username: currentUser }).select();
-                if(data) state.boxRemovals.push(data);
+                if(data) state.boxRemovals.push(data[0]);
             }
             renderInventoryModule();
             remForm.reset();
@@ -921,12 +922,12 @@ function initDistribution() {
         if (editId > -1) {
             const dbId = state.distribution[editId].id;
             const { data } = await supabase2.from('distributions').update({ name, weight, date }).eq('id', dbId).select();
-            if(data) state.distribution[editId] = data;
+            if(data) state.distribution[editId] = data[0];
             editIdInput.value = "-1";
             setEditMode('dist-form', 'dist-submit-btn', false);
         } else {
             const { data } = await supabase2.from('distributions').insert({ name, weight, date, username: currentUser }).select();
-            if(data) state.distribution.push(data);
+            if(data) state.distribution.push(data[0]);
         }
 
         renderDistribution();
