@@ -249,8 +249,8 @@ function setEditMode(formId, btnId, isEdit) {
             btn.textContent = "Save Changes";
             btn.classList.add("edit-mode");
         } else {
-            const defaultText = formId === 'inv-start-form' ? "Set Starting Weight" :
-                                formId === 'inv-rem-form' ? "Log Removal" : "Save Entry";
+            const defaultText = formId === 'inv-start-form' ? "Set Day Starting Weight" :
+                                formId === 'inv-rem-form' ? "Log Day Ending Weight" : "Save Entry";
             btn.textContent = defaultText;
             btn.classList.remove("edit-mode");
         }
@@ -678,29 +678,20 @@ function getAllBoxes() {
 
 function getCalculatedStartWeights(targetDate) {
     const result = {};
-    const boxes = getAllBoxes();
     
-    boxes.forEach(box => {
-        const starts = state.boxStarts.filter(s => s.box === box && s.date <= targetDate);
-        if (starts.length === 0) {
-            result[box] = { weight: 0, isOverride: false };
-            return;
+    // Find all starts on this exact date
+    state.boxStarts.forEach(s => {
+        if (s.date === targetDate) {
+            result[s.box] = { weight: s.weight, isOverride: true };
         }
-        
-        starts.sort((a, b) => b.date.localeCompare(a.date));
-        const latestStart = starts[0];
-        
-        const startDate = latestStart.date;
-        const startWeight = latestStart.weight;
-        
-        const removals = state.boxRemovals
-            .filter(r => r.box === box && r.date >= startDate && r.date < targetDate)
-            .reduce((sum, r) => sum + r.weight, 0);
-            
-        result[box] = {
-            weight: Math.max(0, startWeight - removals),
-            isOverride: startDate === targetDate
-        };
+    });
+    
+    // Also include any suggested/removals boxes that don't have starting weights yet
+    const boxes = getAllBoxes();
+    boxes.forEach(box => {
+        if (!result[box]) {
+            result[box] = { weight: 0, isOverride: false };
+        }
     });
     
     return result;
@@ -728,6 +719,67 @@ window.editRemoval = function(index) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+window.forwardDataToNextDay = async function() {
+    const masterDateInput = document.getElementById('master-inv-date');
+    if (!masterDateInput) return;
+    const currentDate = masterDateInput.value;
+    if (!currentDate) {
+        alert("Please select a valid date first.");
+        return;
+    }
+
+    const rems = state.boxRemovals.filter(r => r.date === currentDate);
+    if (rems.length === 0) {
+        alert(`No Day Ending weights recorded for ${currentDate}. Nothing to forward.`);
+        return;
+    }
+
+    if (!confirm(`Are you sure you want to forward ${rems.length} Day Ending weights from ${currentDate} to the next day as Day Starting weights?`)) {
+        return;
+    }
+
+    const parts = currentDate.split('-');
+    const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+    dateObj.setDate(dateObj.getDate() + 1);
+    const yyyy = dateObj.getFullYear();
+    const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dateObj.getDate()).padStart(2, '0');
+    const nextDate = `${yyyy}-${mm}-${dd}`;
+
+    try {
+        const promises = rems.map(async (rem) => {
+            const box = rem.box;
+            const weight = rem.weight;
+            const existingIndex = state.boxStarts.findIndex(s => s.box === box && s.date === nextDate);
+            
+            if (existingIndex > -1) {
+                const dbId = state.boxStarts[existingIndex].id;
+                const { data, error } = await supabase2.from('box_starts').update({ weight }).eq('id', dbId).select();
+                if (error) throw error;
+                if (data && data[0]) {
+                    state.boxStarts[existingIndex] = data[0];
+                }
+            } else {
+                const { data, error } = await supabase2.from('box_starts').insert({ box, weight, date: nextDate, username: currentUser }).select();
+                if (error) throw error;
+                if (data && data[0]) {
+                    state.boxStarts.push(data[0]);
+                }
+            }
+        });
+
+        await Promise.all(promises);
+        alert(`Successfully forwarded ending weights to starting weights for ${nextDate}!`);
+        
+        // Refresh UI
+        renderInventoryModule();
+        updateDailySummary();
+    } catch (e) {
+        console.error("Error forwarding data to next day:", e);
+        alert("Failed to forward data. Check console for details.");
+    }
+};
+
 window.renderInventoryModule = function() {
     const masterDate = document.getElementById('master-inv-date').value || getTodayFormatted();
     
@@ -742,11 +794,11 @@ window.renderInventoryModule = function() {
             if (box.toLowerCase().includes(filterStartBox)) {
                 const tr = document.createElement('tr');
                 let statusHtml = data.isOverride ? `
-                    <span class="badge" style="background: rgba(212, 175, 55, 0.15); color: var(--accent-color); border: 1px solid rgba(212, 175, 55, 0.4);">Manual</span>
-                    <button class="btn-icon btn-delete" onclick="deleteStartOverride('${box}', '${masterDate}')" title="Delete Manual Override">
+                    <span class="badge" style="background: rgba(212, 175, 55, 0.15); color: var(--accent-color); border: 1px solid rgba(212, 175, 55, 0.4);">Set</span>
+                    <button class="btn-icon btn-delete" onclick="deleteStartOverride('${box}', '${masterDate}')" title="Delete Weight">
                         <i class="ph ph-trash"></i>
                     </button>
-                ` : `<span class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">Calculated</span>`;
+                ` : `<span class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1);">Not Set</span>`;
                 
                 tr.innerHTML = `<td>${box}</td><td>${data.weight.toFixed(2)}</td><td><div style="display: flex; align-items: center; gap: 8px;">${statusHtml}</div></td>`;
                 startTbody.appendChild(tr);
@@ -788,6 +840,35 @@ window.renderInventoryModule = function() {
             }
         });
         if (totalRemEl) totalRemEl.textContent = totalRem.toFixed(2);
+    }
+
+    // RENDER DIFFERENCE TABLE
+    const diffTbody = document.getElementById('inv-diff-tbody');
+    const totalDiffEl = document.getElementById('total-inv-diff');
+    if (diffTbody) {
+        diffTbody.innerHTML = '';
+        let totalDiff = 0;
+        
+        const startWeights = getCalculatedStartWeights(masterDate);
+        Object.entries(startWeights).forEach(([box, data]) => {
+            const endingRecord = state.boxRemovals.find(r => r.box === box && r.date === masterDate);
+            if (endingRecord) {
+                const starting = data.weight;
+                const ending = endingRecord.weight;
+                const diff = Math.max(0, starting - ending);
+                totalDiff += diff;
+                
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${box}</td>
+                    <td>${starting.toFixed(2)}</td>
+                    <td>${ending.toFixed(2)}</td>
+                    <td style="font-weight: 600; color: var(--accent-color);">${diff.toFixed(2)}</td>
+                `;
+                diffTbody.appendChild(tr);
+            }
+        });
+        if (totalDiffEl) totalDiffEl.textContent = totalDiff.toFixed(2);
     }
 }
 
@@ -975,21 +1056,24 @@ function updateDailySummary() {
     const sumLoss = state.losses.filter(l => l.date === selectedDate).reduce((sum, l) => sum + l.amount, 0);
     const sumDist = state.distribution.filter(d => d.date === selectedDate).reduce((sum, d) => sum + d.weight, 0);
 
-    let sumBox = 0;
+    // Day Ending weights sum
+    const sumBoxRemoved = state.boxRemovals
+        .filter(r => r.date === selectedDate)
+        .reduce((sum, r) => sum + r.weight, 0);
+
+    // Calculate Day Starting weights sum
     const startWeights = getCalculatedStartWeights(selectedDate);
-    Object.entries(startWeights).forEach(([box, data]) => {
-        const removalsOnDate = state.boxRemovals
-            .filter(r => r.box === box && r.date === selectedDate)
-            .reduce((sum, r) => sum + r.weight, 0);
-        sumBox += Math.max(0, data.weight - removalsOnDate);
-    });
+    const sumBoxStarting = Object.values(startWeights).reduce((sum, d) => sum + d.weight, 0);
+
+    // Difference (Day Starting - Day Ending) -> "Gold removed from Box"
+    const sumBoxDiff = sumBoxStarting - sumBoxRemoved;
 
     if(document.getElementById('sum-22ct')) document.getElementById('sum-22ct').textContent = sum22ct.toFixed(4);
     if(document.getElementById('sum-loss')) document.getElementById('sum-loss').textContent = "- " + sumLoss.toFixed(4);
-    if(document.getElementById('sum-box')) document.getElementById('sum-box').textContent = "+ " + sumBox.toFixed(4);
+    if(document.getElementById('sum-box')) document.getElementById('sum-box').textContent = "+ " + sumBoxDiff.toFixed(4);
     if(document.getElementById('sum-dist')) document.getElementById('sum-dist').textContent = "- " + sumDist.toFixed(4);
 
-    const finalTotal22 = sum22ct - sumLoss + sumBox - sumDist;
+    const finalTotal22 = sum22ct - sumLoss + sumBoxDiff - sumDist;
     const finalTotalEl = document.getElementById('final-total');
     if(finalTotalEl) {
         finalTotalEl.innerHTML = `${finalTotal22.toFixed(4)} <span class="unit">grams</span>`;
