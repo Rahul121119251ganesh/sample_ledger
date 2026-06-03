@@ -57,7 +57,7 @@
                 <li>
                     <button class="nav-btn" data-target="module-daily">
                         <i class="ph ph-calendar-check"></i>
-                        Daily Summary
+                        Daily Stock Available
                     </button>
                 </li>
             </ul>
@@ -320,7 +320,7 @@
             <section id="module-inventory" class="module">
                 <header class="module-header">
                     <h2>Box Inventory</h2>
-                    <p>Manage physical inventory of gold across different boxes. Filter by date to view starting and removed weights.</p>
+                    <p>Manage physical inventory of gold across different boxes. Filter by date to view Day Starting and Day Ending weights.</p>
                 </header>
 
                 <!-- Master Date Filter -->
@@ -333,10 +333,10 @@
 
                 <div class="inventory-split-layout" style="display: flex; flex-direction: column; gap: 32px;">
                     
-                    <!-- Block 1: Starting Weights -->
+                    <!-- Block 1: Day Starting Weights -->
                     <div class="inventory-block">
                         <div class="card form-card">
-                            <h3 id="inv-start-form-title">Set Starting Weight</h3>
+                            <h3 id="inv-start-form-title">Set Day Starting Weight</h3>
                             <form id="inv-start-form" class="input-form">
                                 <input type="hidden" id="inv-start-edit-id" value="-1">
                                 <div class="form-group">
@@ -347,13 +347,13 @@
                                     <label for="inv-start-weight">Weight (grams)</label>
                                     <input type="number" step="0.01" id="inv-start-weight" required>
                                 </div>
-                                <button type="submit" class="btn-primary" id="inv-start-submit-btn">Set Starting Weight</button>
+                                <button type="submit" class="btn-primary" id="inv-start-submit-btn">Set Day Starting Weight</button>
                             </form>
                         </div>
 
                         <div class="card table-card" id="tc-inv-start">
                             <div class="table-header-action">
-                                <h3>Starting Weights</h3>
+                                <h3>Day Starting Weights</h3>
                             </div>
                             <div class="table-container">
                                 <table>
@@ -375,10 +375,10 @@
                         </div>
                     </div>
 
-                    <!-- Block 2: Removed Weights -->
+                    <!-- Block 2: Day Ending Weights -->
                     <div class="inventory-block">
                         <div class="card form-card">
-                            <h3 id="inv-rem-form-title">Log Removed Weight</h3>
+                            <h3 id="inv-rem-form-title">Log Day Ending Weight</h3>
                             <form id="inv-rem-form" class="input-form">
                                 <input type="hidden" id="inv-rem-edit-id" value="-1">
                                 <div class="form-group">
@@ -389,18 +389,17 @@
                                     <label for="inv-rem-weight">Weight (grams)</label>
                                     <input type="number" step="0.01" id="inv-rem-weight" required>
                                 </div>
-                                <button type="submit" class="btn-primary" id="inv-rem-submit-btn">Log Removal</button>
+                                <button type="submit" class="btn-primary" id="inv-rem-submit-btn">Log Day Ending Weight</button>
                             </form>
                         </div>
 
                         <div class="card table-card" id="tc-inv-rem">
                             <div class="table-header-action">
-                                <h3>Removed Weights</h3>
-                                <div class="totals-pill">
-                                    <span class="total-label">Total Removed:</span>
-                                    <span id="total-inv-rem" class="total-value">0.00</span>
-                                </div>
+                                <h3>Day Ending Weights</h3>
                                 <div class="action-buttons-header">
+                                    <button class="btn-secondary" id="btn-forward-data" onclick="forwardDataToNextDay()">
+                                        <i class="ph ph-arrow-right"></i> Forward data to next day
+                                    </button>
                                     <button class="btn-secondary" onclick="toggleEditMode('invRem')">
                                         <i class="ph ph-pencil"></i> Edit in Table
                                     </button>
@@ -424,6 +423,34 @@
                                     </thead>
                                     <tbody id="inv-rem-tbody">
                                         <!-- Entries will be injected here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Block 3: Difference (Day Starting - Day Ending) -->
+                    <div class="inventory-block">
+                        <div class="card table-card" id="tc-inv-diff">
+                            <div class="table-header-action">
+                                <h3>Difference (Day Starting - Day Ending)</h3>
+                                <div class="totals-pill">
+                                    <span class="total-label">Total Difference:</span>
+                                    <span id="total-inv-diff" class="total-value">0.00</span>
+                                </div>
+                            </div>
+                            <div class="table-container">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>Box Number</th>
+                                            <th>Day Starting (grams)</th>
+                                            <th>Day Ending (grams)</th>
+                                            <th>Difference (grams)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="inv-diff-tbody">
+                                        <!-- Difference entries will be injected here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -504,11 +531,11 @@
                 </div>
             </section>
 
-            <!-- Module 5: Daily Summary -->
+            <!-- Module 5: Daily Stock Available -->
             <section id="module-daily" class="module">
                 <header class="module-header">
-                    <h2>Daily Summary</h2>
-                    <p>Select a date to view the net gold left for that day.</p>
+                    <h2>Daily Stock Available</h2>
+                    <p>Select a date to view the daily stock available.</p>
                 </header>
 
                 <div class="card summary-filter-card">
@@ -528,7 +555,7 @@
                         <div class="summary-value" id="sum-loss">- 0.00</div>
                     </div>
                     <div class="summary-box">
-                        <div class="summary-label">Box Weight</div>
+                        <div class="summary-label">Gold removed from Box</div>
                         <div class="summary-value" id="sum-box">+ 0.00</div>
                     </div>
                     <div class="summary-box">
@@ -540,9 +567,9 @@
                 <div class="final-totals-container" style="display: flex; gap: 24px; margin-top: 24px;">
                     <!-- 22ct Final Block -->
                     <div class="card final-summary-card" style="flex: 1;">
-                        <h3>Total 22 ct. Gold Left for <span id="display-summary-date-22">selected date</span></h3>
+                        <h3>Daily Stock Available for <span id="display-summary-date-22">selected date</span></h3>
                         <div class="huge-value" id="final-total">0.00 <span class="unit">grams</span></div>
-                        <p class="formula-hint">Formula: (22ct Gold) - (Worker Loss) + (Box Weight) - (Distribution)</p>
+                        <p class="formula-hint">Formula: (22ct Gold) - (Worker Loss) + (Gold removed from Box) - (Distribution)</p>
                     </div>
 
                     <!-- 24ct Final Block -->
