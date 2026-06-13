@@ -1,7 +1,8 @@
 const supabase2_URL = 'https://iojcfzxwafdbnhxfgffe.supabase.co';
 const supabase2_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlvamNmenh3YWZkYm5oeGZnZmZlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkyNzYyOTcsImV4cCI6MjA5NDg1MjI5N30.2Ao6_cxFev400bf8MB8831zUdcihsKIwdhw_ezFPFlE';
 const supabase2 = window.supabase.createClient(supabase2_URL, supabase2_ANON_KEY);
-let currentUser = null; // Stores the logged-in username string
+let currentUser = null;      // Stores the logged-in Supabase Auth UUID
+let currentUserEmail = null; // Stores display email/name
 
 // --- State Management ---
 let state = {
@@ -34,6 +35,19 @@ async function loadStateFromCloud() {
             supabase2.from('distributions').select('*') // Handled table name synchronization
         ]);
         
+        const errors = [];
+        if (inc.error) errors.push(`Incoming: ${inc.error.message} (Code: ${inc.error.code})`);
+        if (conv.error) errors.push(`Conversions: ${conv.error.message} (Code: ${conv.error.code})`);
+        if (loss.error) errors.push(`Losses: ${loss.error.message} (Code: ${loss.error.code})`);
+        if (bStarts.error) errors.push(`Box Starts: ${bStarts.error.message} (Code: ${bStarts.error.code})`);
+        if (bRems.error) errors.push(`Box Removals: ${bRems.error.message} (Code: ${bRems.error.code})`);
+        if (dist.error) errors.push(`Distributions: ${dist.error.message} (Code: ${dist.error.code})`);
+
+        if (errors.length > 0) {
+            console.error("Supabase load errors:", errors);
+            alert("Database Error loading some tables:\n\n" + errors.join("\n\n") + "\n\nPlease check if your Supabase tables match the schema and policies, or contact support.");
+        }
+
         state.incoming = inc.data || [];
         state.conversions = conv.data || [];
         state.losses = loss.data || [];
@@ -57,173 +71,114 @@ async function loadStateFromCloud() {
         if(document.getElementById('module-daily').classList.contains('active')) updateDailySummary();
     } catch (e) {
         console.error("Error loading state from supabase2", e);
+        alert("Critical error loading state: " + e.message);
     }
 }
 
-// --- Custom Database Authentication ---
-// --- Authentication ---
-// --- Authentication ---
+// --- Authentication (Supabase Auth) ---
 async function initAuth() {
-    const savedUser = localStorage.getItem('app_user_session');
-    if (savedUser) {
-        handleAuthChange({ user: { id: 'local-session', email: savedUser } });
-    } else {
-        handleAuthChange(null);
-    }
+    // Restore session from Supabase on page load
+    const { data: { session } } = await supabase2.auth.getSession();
+    handleAuthChange(session);
+
+    // Listen for auth state changes (login / logout)
+    supabase2.auth.onAuthStateChange((_event, session) => {
+        handleAuthChange(session);
+    });
 
     const loginForm = document.getElementById('login-form');
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            
-            const usernameInput = document.getElementById('login-username')?.value.trim() || 
-                                  document.getElementById('login-email')?.value.trim();
+
+            const emailInput = document.getElementById('login-username')?.value.trim();
             const passwordInput = document.getElementById('login-password')?.value;
             const errDiv = document.getElementById('login-error');
             const submitBtn = document.getElementById('btn-login-submit');
-            
-            if (!usernameInput || !passwordInput) {
+
+            if (!emailInput || !passwordInput) {
                 if (errDiv) {
-                    errDiv.textContent = "Please enter both username and password.";
+                    errDiv.textContent = 'Please enter both email and password.';
                     errDiv.style.display = 'block';
                 }
                 return;
             }
 
             if (errDiv) errDiv.style.display = 'none';
-            if (submitBtn) {
-                submitBtn.disabled = true;
-                submitBtn.textContent = 'Verifying...';
-            }
+            if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Signing in...'; }
 
-            try {
-                console.log("Attempting login for:", usernameInput);
+            const { data, error } = await supabase2.auth.signInWithPassword({
+                email: emailInput,
+                password: passwordInput
+            });
 
-                const { data, error } = await supabase2.from('app_users').select('*');
-
-                if (error || !data || data.length === 0) {
-                    if (errDiv) {
-                        errDiv.textContent = "Database connection error or no users configured.";
-                        errDiv.style.display = 'block';
-                    }
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.textContent = 'Login';
-                    }
-                    return;
-                }
-
-                const matchedUser = data.find(user => {
-                    let dbUsername = "";
-                    let dbPassword = "";
-
-                    Object.keys(user).forEach(key => {
-                        const cleanKey = key.trim().toLowerCase();
-                        if (cleanKey === 'user name' || cleanKey === 'username') {
-                            dbUsername = String(user[key]).trim();
-                        }
-                        if (cleanKey === 'password') {
-                            dbPassword = String(user[key]).trim();
-                        }
-                    });
-
-                    return dbUsername === usernameInput && dbPassword === passwordInput;
-                });
-
-                if (!matchedUser) {
-                    if (errDiv) {
-                        errDiv.textContent = "Invalid username or password.";
-                        errDiv.style.display = 'block';
-                    }
-                    if (submitBtn) {
-                        submitBtn.textContent = 'Login';
-                        submitBtn.disabled = false;
-                    }
-                } else {
-                    let verifiedUsername = usernameInput;
-                    Object.keys(matchedUser).forEach(key => {
-                        if (key.trim().toLowerCase() === 'user name' || key.trim().toLowerCase() === 'username') {
-                            verifiedUsername = String(matchedUser[key]).trim();
-                        }
-                    });
-                    
-                    localStorage.setItem('app_user_session', verifiedUsername);
-                    handleAuthChange({ user: { id: 'local-session', email: verifiedUsername } });
-                    
-                    if (loginForm) loginForm.reset();
-                    if (submitBtn) {
-                        submitBtn.textContent = 'Login';
-                        submitBtn.disabled = false;
-                    }
-                }
-            } catch (err) {
-                console.error("Critical routing breakdown:", err);
+            if (error || !data?.user) {
                 if (errDiv) {
-                    errDiv.textContent = "Connection error. Please try again.";
+                    errDiv.textContent = error?.message || 'Invalid email or password.';
                     errDiv.style.display = 'block';
                 }
-                if (submitBtn) {
-                    submitBtn.textContent = 'Login';
-                    submitBtn.disabled = false;
-                }
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Login'; }
+            } else {
+                if (loginForm) loginForm.reset();
+                if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Login'; }
+                // onAuthStateChange will fire and call handleAuthChange automatically
             }
         });
     }
 
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) {
-        btnLogout.addEventListener('click', () => {
-            localStorage.removeItem('app_user_session');
-            handleAuthChange(null);
+        btnLogout.addEventListener('click', async () => {
+            await supabase2.auth.signOut();
+            // onAuthStateChange will fire and call handleAuthChange automatically
         });
     }
 }
 
 async function handleAuthChange(session) {
-    currentUser = session?.user?.email || null;
+    // Store the user's UUID (used for RLS) and email (for display)
+    currentUser = session?.user?.id || null;
+    currentUserEmail = session?.user?.email || null;
+
     const sidebar = document.getElementById('app-sidebar');
     const mainContent = document.getElementById('app-main-content');
     const loginModule = document.getElementById('module-login');
-    
+
     const activeUserEl = document.getElementById('active-username');
     if (activeUserEl) {
-        activeUserEl.textContent = currentUser || 'Guest';
+        activeUserEl.textContent = currentUserEmail || 'Guest';
     }
-    
-    // Look for valid module containers present in your HTML markup
+
     const defaultModule = document.getElementById('module-incoming') || document.querySelector('.module:not(#module-login)');
     const allModules = document.querySelectorAll('.module');
-    
+
     if (currentUser) {
         if (sidebar) sidebar.style.display = 'flex';
         if (mainContent) mainContent.style.display = 'block';
-        
+
         allModules.forEach(m => m.classList.remove('active'));
         if (loginModule) {
             loginModule.style.display = 'none';
             loginModule.classList.remove('active');
         }
-        
-        if (defaultModule) {
-            defaultModule.classList.add('active');
-        }
-        
+
+        if (defaultModule) defaultModule.classList.add('active');
+
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         const defaultNavBtn = document.querySelector('[data-target="module-incoming"]');
         if (defaultNavBtn) defaultNavBtn.classList.add('active');
-        
+
         await loadStateFromCloud();
     } else {
-        // Logged out / initial view: Hide workspace frames, force render the login window frame
         if (sidebar) sidebar.style.display = 'none';
-        if (mainContent) mainContent.style.display = 'block'; 
-        
+        if (mainContent) mainContent.style.display = 'block';
+
         allModules.forEach(m => m.classList.remove('active'));
         if (loginModule) {
             loginModule.style.display = 'block';
             loginModule.classList.add('active');
         }
-        
+
         state = { incoming: [], conversions: [], losses: [], boxStarts: [], boxRemovals: [], distribution: [], suggestions: { purposes: [], workers: [], boxes: [], names: [] } };
     }
 }
@@ -456,18 +411,34 @@ function initIncoming() {
 
         if (editId > -1) {
             const dbId = state.incoming[editId].id;
-            const { data } = await supabase2.from('incoming').update({ weight24, date }).eq('id', dbId).select();
-            if(data) state.incoming[editId] = data[0];
-            editIdInput.value = "-1";
-            setEditMode('incoming-form', 'inc-submit-btn', false);
+            const { data, error } = await supabase2.from('incoming').update({ weight24, date }).eq('id', dbId).select();
+            if (error) {
+                console.error("Error updating incoming entry:", error);
+                alert("Error updating entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.incoming[editId] = data[0];
+                editIdInput.value = "-1";
+                setEditMode('incoming-form', 'inc-submit-btn', false);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Update failed: No data was returned. Make sure the record still exists and you have permissions.");
+            }
         } else {
-            const { data } = await supabase2.from('incoming').insert({ weight24, date, username: currentUser }).select();
-            if(data) state.incoming.push(data[0]);
+            const { data, error } = await supabase2.from('incoming').insert({ weight24, date, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
+            if (error) {
+                console.error("Error inserting incoming entry:", error);
+                alert("Error adding entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.incoming.push(data[0]);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Add failed: No data was returned.");
+            }
         }
 
         renderIncoming();
-        form.reset();
-        dateInput.value = getTodayFormatted();
         updateDailySummary();
     });
 
@@ -549,18 +520,34 @@ function initOutgoing() {
 
         if (editId > -1) {
             const dbId = state.conversions[editId].id;
-            const { data } = await supabase2.from('conversions').update({ purpose, weight24, weight22, date }).eq('id', dbId).select();
-            if(data) state.conversions[editId] = data[0];
-            editIdInput.value = "-1";
-            setEditMode('outgoing-form', 'conv-submit-btn', false);
+            const { data, error } = await supabase2.from('conversions').update({ purpose, weight24, weight22, date }).eq('id', dbId).select();
+            if (error) {
+                console.error("Error updating outgoing entry:", error);
+                alert("Error updating entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.conversions[editId] = data[0];
+                editIdInput.value = "-1";
+                setEditMode('outgoing-form', 'conv-submit-btn', false);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Update failed: No data was returned.");
+            }
         } else {
-            const { data } = await supabase2.from('conversions').insert({ purpose, weight24, weight22, date, username: currentUser }).select();
-            if(data) state.conversions.push(data[0]);
+            const { data, error } = await supabase2.from('conversions').insert({ purpose, weight24, weight22, date, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
+            if (error) {
+                console.error("Error inserting outgoing entry:", error);
+                alert("Error adding entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.conversions.push(data[0]);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Add failed: No data was returned.");
+            }
         }
 
         renderOutgoing();
-        form.reset();
-        dateInput.value = getTodayFormatted();
         updateDailySummary();
     });
 
@@ -639,18 +626,34 @@ function initLoss() {
 
         if (editId > -1) {
             const dbId = state.losses[editId].id;
-            const { data } = await supabase2.from('losses').update({ worker, amount, date }).eq('id', dbId).select();
-            if(data) state.losses[editId] = data[0];
-            editIdInput.value = "-1";
-            setEditMode('loss-form', 'loss-submit-btn', false);
+            const { data, error } = await supabase2.from('losses').update({ worker, amount, date }).eq('id', dbId).select();
+            if (error) {
+                console.error("Error updating loss entry:", error);
+                alert("Error updating entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.losses[editId] = data[0];
+                editIdInput.value = "-1";
+                setEditMode('loss-form', 'loss-submit-btn', false);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Update failed: No data was returned.");
+            }
         } else {
-            const { data } = await supabase2.from('losses').insert({ worker, amount, date, username: currentUser }).select();
-            if(data) state.losses.push(data[0]);
+            const { data, error } = await supabase2.from('losses').insert({ worker, amount, date, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
+            if (error) {
+                console.error("Error inserting loss entry:", error);
+                alert("Error adding entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.losses.push(data[0]);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Add failed: No data was returned.");
+            }
         }
 
         renderLoss();
-        form.reset();
-        dateInput.value = getTodayFormatted();
         updateDailySummary();
     });
 
@@ -760,7 +763,7 @@ window.forwardDataToNextDay = async function() {
                     state.boxStarts[existingIndex] = data[0];
                 }
             } else {
-                const { data, error } = await supabase2.from('box_starts').insert({ box, weight, date: nextDate, username: currentUser }).select();
+                const { data, error } = await supabase2.from('box_starts').insert({ box, weight, date: nextDate, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
                 if (error) throw error;
                 if (data && data[0]) {
                     state.boxStarts.push(data[0]);
@@ -889,24 +892,47 @@ function initInventory() {
 
             if (editId > -1) {
                 const dbId = state.boxStarts[editId].id;
-                const { data } = await supabase2.from('box_starts').update({ box, weight, date }).eq('id', dbId).select();
-                if(data) state.boxStarts[editId] = data[0];
-                document.getElementById('inv-start-edit-id').value = "-1";
-                setEditMode('inv-start-form', 'inv-start-submit-btn', false);
+                const { data, error } = await supabase2.from('box_starts').update({ box, weight, date }).eq('id', dbId).select();
+                if (error) {
+                    console.error("Error updating box start entry:", error);
+                    alert("Error updating entry: " + error.message);
+                } else if (data && data.length > 0) {
+                    state.boxStarts[editId] = data[0];
+                    document.getElementById('inv-start-edit-id').value = "-1";
+                    setEditMode('inv-start-form', 'inv-start-submit-btn', false);
+                    startForm.reset();
+                } else {
+                    alert("Update failed: No data was returned.");
+                }
             } else {
                 const existingIndex = state.boxStarts.findIndex(s => s.box === box && s.date === date);
                 if (existingIndex > -1) {
                     const newWeight = state.boxStarts[existingIndex].weight + weight;
                     const dbId = state.boxStarts[existingIndex].id;
-                    const { data } = await supabase2.from('box_starts').update({ weight: newWeight }).eq('id', dbId).select();
-                    if(data) state.boxStarts[existingIndex] = data[0];
+                    const { data, error } = await supabase2.from('box_starts').update({ weight: newWeight }).eq('id', dbId).select();
+                    if (error) {
+                        console.error("Error updating existing box start entry:", error);
+                        alert("Error updating entry: " + error.message);
+                    } else if (data && data.length > 0) {
+                        state.boxStarts[existingIndex] = data[0];
+                        startForm.reset();
+                    } else {
+                        alert("Update failed: No data was returned.");
+                    }
                 } else {
-                    const { data } = await supabase2.from('box_starts').insert({ box, weight, date, username: currentUser }).select();
-                    if(data) state.boxStarts.push(data[0]);
+                    const { data, error } = await supabase2.from('box_starts').insert({ box, weight, date, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
+                    if (error) {
+                        console.error("Error inserting box start entry:", error);
+                        alert("Error adding entry: " + error.message);
+                    } else if (data && data.length > 0) {
+                        state.boxStarts.push(data[0]);
+                        startForm.reset();
+                    } else {
+                        alert("Add failed: No data was returned.");
+                    }
                 }
             }
             renderInventoryModule();
-            startForm.reset();
             updateDailySummary();
         });
     }
@@ -924,16 +950,31 @@ function initInventory() {
 
             if (editId > -1) {
                 const dbId = state.boxRemovals[editId].id;
-                const { data } = await supabase2.from('box_removals').update({ box, weight, date }).eq('id', dbId).select();
-                if(data) state.boxRemovals[editId] = data[0];
-                document.getElementById('inv-rem-edit-id').value = "-1";
-                setEditMode('inv-rem-form', 'inv-rem-submit-btn', false);
+                const { data, error } = await supabase2.from('box_removals').update({ box, weight, date }).eq('id', dbId).select();
+                if (error) {
+                    console.error("Error updating box removal entry:", error);
+                    alert("Error updating entry: " + error.message);
+                } else if (data && data.length > 0) {
+                    state.boxRemovals[editId] = data[0];
+                    document.getElementById('inv-rem-edit-id').value = "-1";
+                    setEditMode('inv-rem-form', 'inv-rem-submit-btn', false);
+                    remForm.reset();
+                } else {
+                    alert("Update failed: No data was returned.");
+                }
             } else {
-                const { data } = await supabase2.from('box_removals').insert({ box, weight, date, username: currentUser }).select();
-                if(data) state.boxRemovals.push(data[0]);
+                const { data, error } = await supabase2.from('box_removals').insert({ box, weight, date, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
+                if (error) {
+                    console.error("Error inserting box removal entry:", error);
+                    alert("Error adding entry: " + error.message);
+                } else if (data && data.length > 0) {
+                    state.boxRemovals.push(data[0]);
+                    remForm.reset();
+                } else {
+                    alert("Add failed: No data was returned.");
+                }
             }
             renderInventoryModule();
-            remForm.reset();
             updateDailySummary();
         });
     }
@@ -1002,18 +1043,34 @@ function initDistribution() {
 
         if (editId > -1) {
             const dbId = state.distribution[editId].id;
-            const { data } = await supabase2.from('distributions').update({ name, weight, date }).eq('id', dbId).select();
-            if(data) state.distribution[editId] = data[0];
-            editIdInput.value = "-1";
-            setEditMode('dist-form', 'dist-submit-btn', false);
+            const { data, error } = await supabase2.from('distributions').update({ name, weight, date }).eq('id', dbId).select();
+            if (error) {
+                console.error("Error updating distribution entry:", error);
+                alert("Error updating entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.distribution[editId] = data[0];
+                editIdInput.value = "-1";
+                setEditMode('dist-form', 'dist-submit-btn', false);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Update failed: No data was returned.");
+            }
         } else {
-            const { data } = await supabase2.from('distributions').insert({ name, weight, date, username: currentUser }).select();
-            if(data) state.distribution.push(data[0]);
+            const { data, error } = await supabase2.from('distributions').insert({ name, weight, date, user_id: currentUser, username: currentUserEmail || currentUser || 'user' }).select();
+            if (error) {
+                console.error("Error inserting distribution entry:", error);
+                alert("Error adding entry: " + error.message);
+            } else if (data && data.length > 0) {
+                state.distribution.push(data[0]);
+                form.reset();
+                dateInput.value = getTodayFormatted();
+            } else {
+                alert("Add failed: No data was returned.");
+            }
         }
 
         renderDistribution();
-        form.reset();
-        dateInput.value = getTodayFormatted();
         updateDailySummary();
     });
 
@@ -1065,15 +1122,12 @@ function updateDailySummary() {
     const startWeights = getCalculatedStartWeights(selectedDate);
     const sumBoxStarting = Object.values(startWeights).reduce((sum, d) => sum + d.weight, 0);
 
-    // Difference (Day Starting - Day Ending) -> "Gold removed from Box"
-    const sumBoxDiff = sumBoxStarting - sumBoxRemoved;
-
     if(document.getElementById('sum-22ct')) document.getElementById('sum-22ct').textContent = sum22ct.toFixed(4);
     if(document.getElementById('sum-loss')) document.getElementById('sum-loss').textContent = "- " + sumLoss.toFixed(4);
-    if(document.getElementById('sum-box')) document.getElementById('sum-box').textContent = "+ " + sumBoxDiff.toFixed(4);
+    if(document.getElementById('sum-box')) document.getElementById('sum-box').textContent = "+ " + sumBoxStarting.toFixed(4);
     if(document.getElementById('sum-dist')) document.getElementById('sum-dist').textContent = "- " + sumDist.toFixed(4);
 
-    const finalTotal22 = sum22ct - sumLoss + sumBoxDiff - sumDist;
+    const finalTotal22 = sum22ct - sumLoss + sumBoxStarting - sumDist;
     const finalTotalEl = document.getElementById('final-total');
     if(finalTotalEl) {
         finalTotalEl.innerHTML = `${finalTotal22.toFixed(4)} <span class="unit">grams</span>`;
